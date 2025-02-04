@@ -17,6 +17,7 @@ db=client.get_database('Health')
 Doctor_collection=db['Doctor']
 Student_collection = db['Student']
 PendingStudent_collection = db['PendingStudent']
+CORS(app)
 
 
 Doctor_collection.create_index("email", unique=True)
