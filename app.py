@@ -7,6 +7,8 @@ import smtplib
 import string
 import secrets
 import os
+from flask_cors import CORS
+
 
 
 
