@@ -415,5 +415,81 @@ def reject_patient():
 
 
 
+def send_reset_email(recipient, usertype):
+    """Send an email notifying the user of a successful password reset."""
+    sender_email = "vutukuridinesh18@gmail.com"
+    sender_password = "krvz zgas bqsu ymuh"
+    smtp_server = "smtp.gmail.com"
+    smtp_port = 587
+
+    message = f"""Subject: Password Reset Confirmation
+
+    Dear {usertype},
+
+    Your password has been successfully reset.
+
+    If you did not request this change, please contact support immediately.
+
+    Best regards,
+    HealthCare Team
+    """
+
+    # Send the email
+    with smtplib.SMTP(smtp_server, smtp_port) as server:
+        server.starttls()  # Secure the connection
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, recipient, message)
+
+@app.route('/reset_password', methods=['POST'])
+def reset_password():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
+
+        email = data.get('email')
+        old_password = data.get('oldPassword')
+        new_password = data.get('newPassword')
+
+        if not all([email, old_password, new_password]):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        # Check if the user is a doctor
+        user = Doctor_collection.find_one({"email": email})
+        if user and check_password_hash(user['password'], old_password):
+            # Check if the new password is different from the old password
+            if old_password == new_password:
+                return jsonify({"error": "New password must be different from the old password."}), 400
+
+            # Update to new password
+            new_hashed_password = generate_password_hash(new_password)
+            Doctor_collection.update_one(
+                {"email": email},
+                {"$set": {"password": new_hashed_password}}
+            )
+            send_reset_email(email, "Doctor")
+            return jsonify({"message": "Password reset successfully for doctor."}), 200
+
+        # Check if the user is a student
+        user = Student_collection.find_one({"email": email})
+        if user and check_password_hash(user['password'], old_password):
+            # Check if the new password is different from the old password
+            if old_password == new_password:
+                return jsonify({"error": "New password must be different from the old password."}), 400
+
+            # Update to new password
+            new_hashed_password = generate_password_hash(new_password)
+            Student_collection.update_one(
+                {"email": email},
+                {"$set": {"password": new_hashed_password}}
+            )
+            send_reset_email(email, "Student")
+            return jsonify({"message": "Password reset successfully for student."}), 200
+
+        # If no match or incorrect old password
+        return jsonify({"error": "Invalid email or password."}), 401
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred during password reset: {str(e)}"}), 500
 if __name__ == '__main__':
     app.run(debug=True)
