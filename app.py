@@ -33,7 +33,7 @@ Student_collection.create_index("studentId", unique=True)
 
 def generate_admin_credentials():
     """Generate admin username and password."""
-    username = "admin"
+    username = "admin@1"
     password = "admin123"  # Use the same password generation function
     hashed_password = generate_password_hash(password)
 
@@ -242,7 +242,7 @@ def send_student_email(recipient, email, password):
 
 
 
-ADMIN_USERNAME = "admin"
+ADMIN_USERNAME = "admin@1"
 ADMIN_PASSWORD = generate_password_hash("admin123")  # Predefined password
 
 @app.route('/login', methods=['POST'])
