@@ -164,10 +164,10 @@ def register_student():
         if not all([name, email, phone, studentId, college, degree]):
             return jsonify({"error": "Missing required fields"}), 400
 
-        # Check for existing email or studentId in pending and approved collections
-        if PendingStudent_collection.find_one({"email": email}) or Student_collection.find_one({"email": email}):
+        # Check for existing email or studentId in the approved collection
+        if Student_collection.find_one({"email": email}):
             return jsonify({"error": "Email already registered."}), 400
-        if PendingStudent_collection.find_one({"studentId": studentId}) or Student_collection.find_one({"studentId": studentId}):
+        if Student_collection.find_one({"studentId": studentId}):
             return jsonify({"error": "Student ID already registered."}), 400
 
         # Generate a random password
@@ -176,8 +176,8 @@ def register_student():
         # Hash the password
         hashed_password = generate_password_hash(password)
 
-        # Create a new pending student document
-        pending_student = {
+        # Create a new student document
+        student = {
             "name": name,
             "email": email,
             "phone": phone,
@@ -185,18 +185,19 @@ def register_student():
             "college": college,
             "degree": degree,
             "usertype": "student",
-            "password": hashed_password, # Store hashed password
-            "plain_password": password
+            "password": hashed_password  # Store hashed password
         }
 
-        # Insert the student into the pending collection
-        PendingStudent_collection.insert_one(pending_student)
+        # Insert the student into the collection
+        Student_collection.insert_one(student)
 
-        return jsonify({"message": "Student registered successfully! Awaiting approval."}), 201
+        # Send email with login details
+        send_student_email(email, email, password)
+
+        return jsonify({"message": "Student registered successfully! Login details sent to email."}), 201
 
     except Exception as e:
         return jsonify({"error": f"An error occurred during registration: {str(e)}"}), 500
-
 
 def send_student_email(recipient, email, password):
     """Send an email with student login details."""
@@ -209,7 +210,7 @@ def send_student_email(recipient, email, password):
 
     Dear Student,
 
-    Your account has been approved. Here are your login details:
+    Your account has been created. Here are your login details:
 
     Email: {email}
     Password: {password}
@@ -224,87 +225,8 @@ def send_student_email(recipient, email, password):
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, recipient, message)
 
-@app.route('/approve_student', methods=['PUT'])
-def approve_student():
-    try:
-        data = request.json
-        if not data:
-            return jsonify({"error": "No input data provided"}), 400
-
-        studentId = data.get('studentId')
-        if not studentId:
-            return jsonify({"error": "Student ID is required"}), 400
-
-        # Check if the student is in the approved collection
-        if Student_collection.find_one({"studentId": studentId}):
-            return jsonify({"error": "Student already approved"}), 400
-
-        # Find the student in the pending collection
-        pending_student = PendingStudent_collection.find_one({"studentId": studentId})
-        if not pending_student:
-            return jsonify({"error": "Student not found in pending approvals"}), 404
-
-        # Move the student to the approved collection
-        Student_collection.insert_one(pending_student)
-        PendingStudent_collection.delete_one({"studentId": studentId})
-
-        # Send email with login details
-        send_student_email(pending_student['email'], pending_student['email'], pending_student['plain_password'])
-
-        return jsonify({"message": "Student approved successfully!"}), 200
-
-    except Exception as e:
-        return jsonify({"error": f"An error occurred during approval: {str(e)}"}), 500
 
 
-@app.route('/reject_student', methods=['PUT'])
-def reject_student():
-    try:
-        data = request.json
-        if not data:
-            return jsonify({"error": "No input data provided"}), 400
-
-        studentId = data.get('studentId')
-        if not studentId:
-            return jsonify({"error": "Student ID is required"}), 400
-
-        # Find the student in the pending collection
-        pending_student = PendingStudent_collection.find_one({"studentId": studentId})
-        if not pending_student:
-            return jsonify({"error": "Student not found in pending approvals"}), 404
-
-        # Remove the student from the pending collection
-        PendingStudent_collection.delete_one({"studentId": studentId})
-
-        # Optionally, send an email to the student about the rejection
-        send_rejection_email(pending_student['email'], pending_student['name'])
-
-        return jsonify({"message": "Student registration rejected successfully."}), 200
-
-    except Exception as e:
-        return jsonify({"error": f"An error occurred during rejection: {str(e)}"}), 500
-def send_rejection_email(recipient, name):
-    """Send an email notifying the student of rejection."""
-    sender_email = "vutukuridinesh18@gmail.com"
-    sender_password = "krvz zgas bqsu ymuh"
-    smtp_server = "smtp.gmail.com"
-    smtp_port = 587
-
-    message = f"""Subject: Registration Rejection Notice
-
-    Dear {name},
-
-    We regret to inform you that your registration has been rejected.
-
-    Best regards,
-    HealthCare Team
-    """
-
-    # Send the email
-    with smtplib.SMTP(smtp_server, smtp_port) as server:
-        server.starttls()  # Secure the connection
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, recipient, message)
 
 
 
