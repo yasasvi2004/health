@@ -18,15 +18,15 @@ client = MongoClient(uri)
 db=client.get_database('Health')
 Doctor_collection=db['Doctor']
 Student_collection = db['Student']
-PendingStudent_collection = db['PendingStudent']
+PendingPatients_collection = db['PendingPatients']
+ApprovedPatients_collection = db['ApprovedPatients']
 CORS(app)
 
 
 Doctor_collection.create_index("email", unique=True)
 Doctor_collection.create_index("doctorId", unique=True)
 
-PendingStudent_collection.create_index("email", unique=True)
-PendingStudent_collection.create_index("studentId", unique=True)
+
 Student_collection.create_index("email", unique=True)
 Student_collection.create_index("studentId", unique=True)
 
@@ -303,7 +303,103 @@ def login():
     except Exception as e:
         return jsonify({"error": f"An error occurred during login: {str(e)}"}), 500
 
+@app.route('/submit_patient', methods=['POST'])
+def submit_patient():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
 
+        # Validate input data
+        patientName = data.get('patientName')
+        patientEmail = data.get('patientEmail')
+        clinicalCondition = data.get('clinicalCondition')
+        studentName = data.get('name')
+        studentId = data.get('studentId')
+
+        if not all([patientName, patientEmail, clinicalCondition, studentName, studentId]):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        # Create a new pending patient document
+        pending_patient = {
+            "patientName": patientName,
+            "patientEmail": patientEmail,
+            "clinicalCondition": clinicalCondition,
+            "submittedBy": {
+                "name": studentName,
+                "studentId": studentId
+            }
+        }
+
+        # Insert the patient into the pending collection
+        PendingPatients_collection.insert_one(pending_patient)
+
+        return jsonify({"message": "Patient details submitted successfully! Awaiting doctor approval."}), 201
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred during submission: {str(e)}"}), 500
+
+
+@app.route('/approve_patient', methods=['PUT'])
+def approve_patient():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
+
+        patientEmail = data.get('patientEmail')
+        if not patientEmail:
+            return jsonify({"error": "Patient email is required"}), 400
+
+        # Find the patient in the pending collection
+        pending_patient = PendingPatients_collection.find_one({"patientEmail": patientEmail})
+        if not pending_patient:
+            return jsonify({"error": "Patient not found in pending approvals"}), 404
+
+        # Update patient details with any new information provided
+        updated_patient = {
+            "patientName": data.get('patientName', pending_patient['patientName']),
+            "patientEmail": patientEmail,  # Email is used as the identifier, so it remains unchanged
+            "clinicalCondition": data.get('clinicalCondition', pending_patient['clinicalCondition']),
+            "submittedBy": pending_patient['submittedBy']  # Keep the original submitter's info
+        }
+
+        # Move the updated patient to the approved collection
+        ApprovedPatients_collection.insert_one(updated_patient)
+        PendingPatients_collection.delete_one({"patientEmail": patientEmail})
+
+        return jsonify({"message": "Patient approved and updated successfully!"}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred during approval: {str(e)}"}), 500
+
+
+@app.route('/reject_patient', methods=['PUT'])
+def reject_patient():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
+
+        patientEmail = data.get('patientEmail')
+        if not patientEmail:
+            return jsonify({"error": "Patient email is required"}), 400
+
+        # Find the patient in the pending collection
+        pending_patient = PendingPatients_collection.find_one({"patientEmail": patientEmail})
+        if not pending_patient:
+            return jsonify({"error": "Patient not found in pending approvals"}), 404
+
+        # Remove the patient from the pending collection
+        PendingPatients_collection.delete_one({"patientEmail": patientEmail})
+
+        # Optionally, send a notification to the student about the rejection
+        student_info = pending_patient['submittedBy']
+
+        return jsonify({"message": "Patient rejected successfully."}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred during rejection: {str(e)}"}), 500
 
 
 
