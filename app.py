@@ -80,30 +80,7 @@ def send_email(recipient, email, password):
 
 
 
-@app.route('/admin_login', methods=['POST'])
-def admin_login():
-    try:
-        data = request.json
-        if not data:
-            return jsonify({"error": "No input data provided"}), 400
 
-        username = data.get('username')
-        password = data.get('password')
-
-        if not username or not password:
-            return jsonify({"error": "Username and password are required"}), 400
-
-        # Check credentials
-        stored_username = os.environ.get('ADMIN_USERNAME')
-        stored_password = os.environ.get('ADMIN_PASSWORD')
-
-        if username == stored_username and check_password_hash(stored_password, password):
-            return jsonify({"message": "Admin login successful"}), 200
-        else:
-            return jsonify({"error": "Invalid username or password"}), 401
-
-    except Exception as e:
-        return jsonify({"error": f"An error occurred during login: {str(e)}"}), 500
 
 
 
@@ -148,6 +125,7 @@ def register_doctor():
             "doctorId": doctorId,
             "designation": designation,
             "placeOfWork": placeOfWork,
+            "usertype": "doctor",
             "password": hashed_password
         }
 
@@ -206,6 +184,7 @@ def register_student():
             "studentId": studentId,
             "college": college,
             "degree": degree,
+            "usertype": "student",
             "password": hashed_password, # Store hashed password
             "plain_password": password
         }
@@ -327,8 +306,85 @@ def send_rejection_email(recipient, name):
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, recipient, message)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = generate_password_hash("admin123")  # Predefined password
+
+@app.route('/login', methods=['POST'])
+def login():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
+
+        email = data.get('email')
+        password = data.get('password')
+
+        # Check if the user is an admin
+        if email == ADMIN_USERNAME and check_password_hash(ADMIN_PASSWORD, password):
+            return jsonify({
+                "message": "Login successful",
+                "user": {
+                    "username": ADMIN_USERNAME,
+                    "usertype": "admin"
+                }
+            }), 200
+
+        # Check if the user is a doctor
+        doctor = Doctor_collection.find_one({"email": email})
+        if doctor and check_password_hash(doctor['password'], password):
+            return jsonify({
+                "message": "Login successful",
+                "user": {
+                    "name": doctor['name'],
+                    "email": doctor['email'],
+                    "mobile": doctor['mobile'],
+                    "doctorId": doctor['doctorId'],
+                    "designation": doctor['designation'],
+                    "placeOfWork": doctor['placeOfWork'],
+                    "usertype": "doctor"
+                }
+            }), 200
+
+        # Check if the user is a student
+        student = Student_collection.find_one({"email": email})
+        if student and check_password_hash(student['password'], password):
+            return jsonify({
+                "message": "Login successful",
+                "user": {
+                    "name": student['name'],
+                    "email": student['email'],
+                    "phone": student['phone'],
+                    "studentId": student['studentId'],
+                    "college": student['college'],
+                    "degree": student['degree'],
+                    "usertype": "student"
+                }
+            }), 200
+
+        # If no match is found
+        return jsonify({"error": "Invalid email or password"}), 401
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred during login: {str(e)}"}), 500
+
+
+
+
+
+
 if __name__ == '__main__':
     app.run(debug=True)
-
-
-
