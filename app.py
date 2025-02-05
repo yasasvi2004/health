@@ -340,6 +340,17 @@ def submit_patient():
         return jsonify({"error": f"An error occurred during submission: {str(e)}"}), 500
 
 
+@app.route('/pending_patients', methods=['GET'])
+def get_pending_patients():
+    try:
+        # Retrieve all pending patients
+        pending_patients = list(PendingPatients_collection.find({}, {'_id': 0}))
+
+        return jsonify({"pending_patients": pending_patients}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred while fetching pending patients: {str(e)}"}), 500
+
 @app.route('/approve_patient', methods=['PUT'])
 def approve_patient():
     try:
