@@ -595,7 +595,7 @@ def reset_password_with_otp():
 
 
 
-@app.route('/get_input_fields', methods=['GET'])
+@app.route('/get_input_fields', methods=['POST'])
 def get_input_fields():
     input_fields = {
         "epicardium": " ",
