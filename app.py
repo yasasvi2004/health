@@ -15,6 +15,7 @@ import random
 
 
 
+
 app = Flask(__name__)
 uri = "mongodb+srv://pandukrishna04:Raina%40143@cluster0.4fkpx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 client = MongoClient(uri)
@@ -553,6 +554,41 @@ def forgot_password():
         return jsonify({"error": f"Failed to send email: {str(e)}"}), 500
 
     return jsonify({"message": "OTP sent successfully"}), 200
+
+
+@app.route('/reset-password-with-otp', methods=['POST'])
+def reset_password_with_otp():
+    data = request.get_json()
+    email = data.get('email')
+    otp = data.get('otp')
+    new_password = data.get('newPassword')
+
+    if not all([email, otp, new_password]):
+        return jsonify({"error": "Email, OTP, and new password are required"}), 400
+
+    # Check if the user is a doctor
+    user = Doctor_collection.find_one({"email": email, "otp": otp})
+    if user:
+        # Reset password
+        new_hashed_password = generate_password_hash(new_password)
+        Doctor_collection.update_one(
+            {"email": email},
+            {"$set": {"password": new_hashed_password, "otp": None}}  # Clear OTP after use
+        )
+        return jsonify({"message": "Password reset successfully for doctor."}), 200
+
+    # Check if the user is a student
+    user = Student_collection.find_one({"email": email, "otp": otp})
+    if user:
+        # Reset password
+        new_hashed_password = generate_password_hash(new_password)
+        Student_collection.update_one(
+            {"email": email},
+            {"$set": {"password": new_hashed_password, "otp": None}}  # Clear OTP after use
+        )
+        return jsonify({"message": "Password reset successfully for student."}), 200
+
+    return jsonify({"error": "Invalid email or OTP"}), 400
 
 
 
