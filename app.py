@@ -8,6 +8,9 @@ import string
 import secrets
 import os
 from flask_cors import CORS
+import random
+
+
 
 
 
@@ -242,8 +245,7 @@ def send_student_email(recipient, email, password):
 
 
 
-ADMIN_USERNAME = "admin@1"
-ADMIN_PASSWORD = generate_password_hash("admin123")  # Predefined password
+
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -256,11 +258,13 @@ def login():
         password = data.get('password')
 
         # Check if the user is an admin
-        if email == ADMIN_USERNAME and check_password_hash(ADMIN_PASSWORD, password):
+        stored_username = os.environ.get('ADMIN_USERNAME')
+        stored_password = os.environ.get('ADMIN_PASSWORD')
+        if email == stored_username and check_password_hash(stored_password, password):
             return jsonify({
                 "message": "Login successful",
                 "user": {
-                    "username": ADMIN_USERNAME,
+                    "username": stored_username,
                     "usertype": "admin"
                 }
             }), 200
@@ -491,5 +495,67 @@ def reset_password():
 
     except Exception as e:
         return jsonify({"error": f"An error occurred during password reset: {str(e)}"}), 500
+
+
+
+
+def generate_otp():
+    return str(random.randint(100000, 999999))
+
+@app.route('/forgot-password', methods=['POST'])
+def forgot_password():
+    data = request.get_json()
+    email = data.get('email')  # User email to send OTP
+
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
+
+    # Check if the user is a doctor
+    user = Doctor_collection.find_one({"email": email})
+    if not user:
+        # Check if the user is a student
+        user = Student_collection.find_one({"email": email})
+        if not user:
+            return jsonify({"error": "User with this email not found"}), 404
+
+    # Generate and save OTP
+    otp = generate_otp()
+    # Save OTP in the user's document (you might want to add an 'otp' field to your user documents)
+    if 'usertype' in user and user['usertype'] == 'doctor':
+        Doctor_collection.update_one({"email": email}, {"$set": {"otp": otp}})
+    else:
+        Student_collection.update_one({"email": email}, {"$set": {"otp": otp}})
+
+    # Send OTP via email using smtplib
+    try:
+        sender_email = "vutukuridinesh18@gmail.com"
+        sender_password = "krvz zgas bqsu ymuh"
+        smtp_server = "smtp.gmail.com"
+        smtp_port = 587
+
+        message = f"""Subject: Password Reset OTP
+
+        Dear User,
+
+        Your OTP for password reset is: {otp}
+
+        If you did not request this, please contact support immediately.
+
+        Best regards,
+        HealthCare Team
+        """
+
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()  # Secure the connection
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, email, message)
+    except Exception as e:
+        return jsonify({"error": f"Failed to send email: {str(e)}"}), 500
+
+    return jsonify({"message": "OTP sent successfully"}), 200
+
+
+
+
 if __name__ == '__main__':
     app.run(debug=True)
