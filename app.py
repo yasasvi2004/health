@@ -22,8 +22,7 @@ client = MongoClient(uri)
 db=client.get_database('Health')
 Doctor_collection=db['Doctor']
 Student_collection = db['Student']
-PendingPatients_collection = db['PendingPatients']
-ApprovedPatients_collection = db['ApprovedPatients']
+
 CORS(app)
 
 
@@ -147,8 +146,12 @@ def register_doctor():
 
 
 
-
-
+def generate_student_id():
+    """Generate a unique student ID."""
+    prefix = "STU"
+    random_number = random.randint(10000, 99999)  # Adjust range as needed
+    student_id = f"{prefix}{random_number}"
+    return student_id
 
 @app.route('/register_student', methods=['POST'])
 def register_student():
@@ -161,18 +164,20 @@ def register_student():
         name = data.get('name')
         email = data.get('email')
         phone = data.get('phone')
-        studentId = data.get('studentId')
         college = data.get('college')
         degree = data.get('degree')
 
-        if not all([name, email, phone, studentId, college, degree]):
+        if not all([name, email, phone, college, degree]):
             return jsonify({"error": "Missing required fields"}), 400
 
-        # Check for existing email or studentId in the approved collection
+        # Check for existing email in the approved collection
         if Student_collection.find_one({"email": email}):
             return jsonify({"error": "Email already registered."}), 400
-        if Student_collection.find_one({"studentId": studentId}):
-            return jsonify({"error": "Student ID already registered."}), 400
+
+        # Generate a unique student ID
+        studentId = generate_student_id()
+        while Student_collection.find_one({"studentId": studentId}):
+            studentId = generate_student_id()  # Regenerate if not unique
 
         # Generate a random password
         password = generate_password()
@@ -202,6 +207,8 @@ def register_student():
 
     except Exception as e:
         return jsonify({"error": f"An error occurred during registration: {str(e)}"}), 500
+
+
 
 def send_student_email(recipient, email, password):
     """Send an email with student login details."""
@@ -307,115 +314,6 @@ def login():
 
     except Exception as e:
         return jsonify({"error": f"An error occurred during login: {str(e)}"}), 500
-
-@app.route('/submit_patient', methods=['POST'])
-def submit_patient():
-    try:
-        data = request.json
-        if not data:
-            return jsonify({"error": "No input data provided"}), 400
-
-        # Validate input data
-        patientName = data.get('patientName')
-        patientEmail = data.get('patientEmail')
-        clinicalCondition = data.get('clinicalCondition')
-        studentName = data.get('name')
-        studentId = data.get('studentId')
-
-        if not all([patientName, patientEmail, clinicalCondition, studentName, studentId]):
-            return jsonify({"error": "Missing required fields"}), 400
-
-        # Create a new pending patient document
-        pending_patient = {
-            "patientName": patientName,
-            "patientEmail": patientEmail,
-            "clinicalCondition": clinicalCondition,
-            "submittedBy": {
-                "name": studentName,
-                "studentId": studentId
-            }
-        }
-
-        # Insert the patient into the pending collection
-        PendingPatients_collection.insert_one(pending_patient)
-
-        return jsonify({"message": "Patient details submitted successfully! Awaiting doctor approval."}), 201
-
-    except Exception as e:
-        return jsonify({"error": f"An error occurred during submission: {str(e)}"}), 500
-
-
-@app.route('/pending_patients', methods=['GET'])
-def get_pending_patients():
-    try:
-        # Retrieve all pending patients
-        pending_patients = list(PendingPatients_collection.find({}, {'_id': 0}))
-
-        return jsonify({"pending_patients": pending_patients}), 200
-
-    except Exception as e:
-        return jsonify({"error": f"An error occurred while fetching pending patients: {str(e)}"}), 500
-
-@app.route('/approve_patient', methods=['PUT'])
-def approve_patient():
-    try:
-        data = request.json
-        if not data:
-            return jsonify({"error": "No input data provided"}), 400
-
-        patientEmail = data.get('patientEmail')
-        if not patientEmail:
-            return jsonify({"error": "Patient email is required"}), 400
-
-        # Find the patient in the pending collection
-        pending_patient = PendingPatients_collection.find_one({"patientEmail": patientEmail})
-        if not pending_patient:
-            return jsonify({"error": "Patient not found in pending approvals"}), 404
-
-        # Update patient details with any new information provided
-        updated_patient = {
-            "patientName": data.get('patientName', pending_patient['patientName']),
-            "patientEmail": patientEmail,  # Email is used as the identifier, so it remains unchanged
-            "clinicalCondition": data.get('clinicalCondition', pending_patient['clinicalCondition']),
-            "submittedBy": pending_patient['submittedBy']  # Keep the original submitter's info
-        }
-
-        # Move the updated patient to the approved collection
-        ApprovedPatients_collection.insert_one(updated_patient)
-        PendingPatients_collection.delete_one({"patientEmail": patientEmail})
-
-        return jsonify({"message": "Patient approved and updated successfully!"}), 200
-
-    except Exception as e:
-        return jsonify({"error": f"An error occurred during approval: {str(e)}"}), 500
-
-
-@app.route('/reject_patient', methods=['PUT'])
-def reject_patient():
-    try:
-        data = request.json
-        if not data:
-            return jsonify({"error": "No input data provided"}), 400
-
-        patientEmail = data.get('patientEmail')
-        if not patientEmail:
-            return jsonify({"error": "Patient email is required"}), 400
-
-        # Find the patient in the pending collection
-        pending_patient = PendingPatients_collection.find_one({"patientEmail": patientEmail})
-        if not pending_patient:
-            return jsonify({"error": "Patient not found in pending approvals"}), 404
-
-        # Remove the patient from the pending collection
-        PendingPatients_collection.delete_one({"patientEmail": patientEmail})
-
-        # Optionally, send a notification to the student about the rejection
-        student_info = pending_patient['submittedBy']
-
-        return jsonify({"message": "Patient rejected successfully."}), 200
-
-    except Exception as e:
-        return jsonify({"error": f"An error occurred during rejection: {str(e)}"}), 500
 
 
 
@@ -591,90 +489,6 @@ def reset_password_with_otp():
     return jsonify({"error": "Invalid email or OTP"}), 400
 
 
-
-
-
-
-@app.route('/get_input_fields', methods=['POST'])
-def get_input_fields():
-    input_fields = {
-        "epicardium": " ",
-        "myocardium": " ",
-        "endocardium": " ",
-        "rightAtrium": " ",
-        "rightVentricle": " ",
-        "leftAtrium": " ",
-        "leftVentricle": " ",
-        "tricuspidValve": " ",
-        "pulmonaryValve": " ",
-        "mitralValve": " ",
-        "aorticValve": " ",
-        "aorta": " ",
-        "pulmonaryArteries": " ",
-        "pulmonaryVeins": " ",
-        "venaCavae": " ",
-        "classification": " "
-    }
-    return jsonify(input_fields), 200
-
-
-
-@app.route('/add_condition', methods=['POST'])
-def add_condition():
-    try:
-        data = request.json
-        if not data:
-            return jsonify({"error": "No input data provided"}), 400
-
-        area = data.get('area')
-        clinical_condition = data.get('clinicalCondition')
-        symptoms = data.get('symptoms')
-        signs = data.get('signs')
-        clinical_observations = data.get('clinicalObservations')
-
-        if not all([area, clinical_condition, symptoms, signs, clinical_observations]):
-            return jsonify({"error": "Missing required fields"}), 400
-
-        # Define allowed areas
-        allowed_areas = [
-            "addEpicardium", "addMyocardium", "addEndocardium",
-            "addRightAtrium", "addRightVentricle", "addLeftAtrium",
-            "addLeftVentricle", "addTricuspidValve", "addPulmonaryValve",
-            "addMitralValve", "addAorticValve", "addAorta",
-            "addPulmonaryArteries", "addPulmonaryVeins", "addVenaCavae","addClassification"
-        ]
-
-        # Validate area
-        if area not in allowed_areas:
-            return jsonify({"error": "Invalid area specified"}), 400
-
-        # Create a new condition document
-        condition = {
-            "area": area,
-            "clinicalCondition": clinical_condition,
-            "symptoms": symptoms,
-            "signs": signs,
-            "clinicalObservations": clinical_observations
-        }
-
-        # Insert the condition into the database
-        db.Conditions.insert_one(condition)
-
-        return jsonify({"message": f"Condition added successfully for {area}!"}), 201
-
-    except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
-@app.route('/view_conditions/<area>', methods=['GET'])
-def view_conditions(area):
-    try:
-        # Retrieve conditions for the specified area
-        conditions = list(db.Conditions.find({"area": area}, {'_id': 0}))
-
-        return jsonify({"conditions": conditions}), 200
-
-    except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
 
