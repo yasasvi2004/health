@@ -593,5 +593,91 @@ def reset_password_with_otp():
 
 
 
+
+
+@app.route('/get_input_fields', methods=['GET'])
+def get_input_fields():
+    input_fields = {
+        "epicardium": " ",
+        "myocardium": " ",
+        "endocardium": " ",
+        "rightAtrium": " ",
+        "rightVentricle": " ",
+        "leftAtrium": " ",
+        "leftVentricle": " ",
+        "tricuspidValve": " ",
+        "pulmonaryValve": " ",
+        "mitralValve": " ",
+        "aorticValve": " ",
+        "aorta": " ",
+        "pulmonaryArteries": " ",
+        "pulmonaryVeins": " ",
+        "venaCavae": " ",
+        "classification": " "
+    }
+    return jsonify(input_fields), 200
+
+
+
+@app.route('/add_condition', methods=['POST'])
+def add_condition():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
+
+        area = data.get('area')
+        clinical_condition = data.get('clinicalCondition')
+        symptoms = data.get('symptoms')
+        signs = data.get('signs')
+        clinical_observations = data.get('clinicalObservations')
+
+        if not all([area, clinical_condition, symptoms, signs, clinical_observations]):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        # Define allowed areas
+        allowed_areas = [
+            "addEpicardium", "addMyocardium", "addEndocardium",
+            "addRightAtrium", "addRightVentricle", "addLeftAtrium",
+            "addLeftVentricle", "addTricuspidValve", "addPulmonaryValve",
+            "addMitralValve", "addAorticValve", "addAorta",
+            "addPulmonaryArteries", "addPulmonaryVeins", "addVenaCavae","addClassification"
+        ]
+
+        # Validate area
+        if area not in allowed_areas:
+            return jsonify({"error": "Invalid area specified"}), 400
+
+        # Create a new condition document
+        condition = {
+            "area": area,
+            "clinicalCondition": clinical_condition,
+            "symptoms": symptoms,
+            "signs": signs,
+            "clinicalObservations": clinical_observations
+        }
+
+        # Insert the condition into the database
+        db.Conditions.insert_one(condition)
+
+        return jsonify({"message": f"Condition added successfully for {area}!"}), 201
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+@app.route('/view_conditions/<area>', methods=['GET'])
+def view_conditions(area):
+    try:
+        # Retrieve conditions for the specified area
+        conditions = list(db.Conditions.find({"area": area}, {'_id': 0}))
+
+        return jsonify({"conditions": conditions}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+
+
 if __name__ == '__main__':
     app.run(debug=True)
