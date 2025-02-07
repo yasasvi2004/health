@@ -9,7 +9,7 @@ import secrets
 import os
 from flask_cors import CORS
 import random
-
+from bson.objectid import ObjectId
 
 
 
@@ -22,6 +22,7 @@ client = MongoClient(uri)
 db=client.get_database('Health')
 Doctor_collection=db['Doctor']
 Student_collection = db['Student']
+HeartAnatomy_collection = db['HeartAnatomy']
 
 CORS(app)
 
@@ -487,6 +488,112 @@ def reset_password_with_otp():
         return jsonify({"message": "Password reset successfully for student."}), 200
 
     return jsonify({"error": "Invalid email or OTP"}), 400
+
+
+
+# Temporary storage for conditions (in-memory, replace with a database in production)
+temporary_conditions = {}
+
+
+@app.route('/add_condition', methods=['POST'])
+def add_condition():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
+
+        student_id = data.get('studentId')
+
+        # Heart parts to check
+        heart_parts = [
+            "addEpicardium", "addMyocardium", "addEndocardium",
+            "addRightAtrium", "addRightVentricle", "addLeftAtrium",
+            "addLeftVentricle", "addTricuspidValve", "addPulmonaryValve",
+            "addMitralValve", "addAorticValve", "addAorta",
+            "addPulmonaryArteries", "addPulmonaryVeins", "addVenaCavae",
+            "addClassification"
+        ]
+
+        # Check if the student exists
+        student = Student_collection.find_one({"studentId": student_id})
+        if not student:
+            return jsonify({"error": "Student not found"}), 404
+
+            # Initialize temporary storage for the student if not exists
+        if student_id not in temporary_conditions:
+            temporary_conditions[student_id] = {}
+
+            # Process each heart part in the payload
+        for heart_part in heart_parts:
+            if heart_part in data:  # Check if the heart part exists in the incoming data
+                for condition in data[heart_part]:
+                    # Create condition entry
+                    condition_entry = {
+                        "clinicalCondition": condition.get('clinicalCondition', ''),
+                        "symptoms": condition.get('symptoms', ''),
+                        "signs": condition.get('signs', ''),
+                        "clinicalObservations": condition.get('clinicalObservations', '')
+                    }
+
+                    # If this heart part is not already in temporary storage, initialize it
+                    if heart_part not in temporary_conditions[student_id]:
+                        temporary_conditions[student_id][heart_part] = []
+
+                        # Add the condition to temporary storage for the specific heart part
+                    temporary_conditions[student_id][heart_part].append(condition_entry)
+
+        return jsonify({"message": "Conditions added successfully"}), 201
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+@app.route('/submit_main_form', methods=['POST'])
+def submit_main_form():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
+
+            # Extract studentId
+        student_id = data.get('studentId')
+        if not student_id:
+            return jsonify({"error": "Student ID is required"}), 400
+
+            # Check if the student exists
+        student = Student_collection.find_one({"studentId": student_id})
+        if not student:
+            return jsonify({"error": "Student not found"}), 404
+
+            # Extract input fields from the main form
+        input_fields = data.get('inputFields', {})
+        if not input_fields:
+            return jsonify({"error": "No input fields provided"}), 400
+
+            # Get temporary conditions for the student
+        student_conditions = temporary_conditions.get(student_id, {})
+
+        # Prepare the document to be saved in MongoDB
+        heart_anatomy_data = {
+            "studentId": student_id,
+            "inputFields": input_fields,
+            "conditions": student_conditions
+        }
+
+        # Insert the data into the HeartAnatomy collection
+        result = HeartAnatomy_collection.insert_one(heart_anatomy_data)
+        if result.inserted_id:
+            # Clear temporary conditions for the student after submission
+            if student_id in temporary_conditions:
+                del temporary_conditions[student_id]
+
+            return jsonify({"message": "Main form submitted successfully", "id": str(result.inserted_id)}), 201
+        else:
+            return jsonify({"error": "Failed to submit data"}), 500
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
 
 
 
