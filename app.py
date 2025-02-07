@@ -548,55 +548,61 @@ def add_condition():
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-@app.route('/submit_main_form', methods=['POST'])
-def submit_main_form():
+@app.route('/submit_form', methods=['POST'])
+def submit_form():
     try:
         data = request.json
         if not data:
             return jsonify({"error": "No input data provided"}), 400
 
-            # Extract studentId
         student_id = data.get('studentId')
+        # Validate student ID existence
         if not student_id:
             return jsonify({"error": "Student ID is required"}), 400
 
-            # Check if the student exists
+        # Check if student exists
         student = Student_collection.find_one({"studentId": student_id})
         if not student:
             return jsonify({"error": "Student not found"}), 404
 
-            # Extract input fields from the main form
-        input_fields = data.get('inputFields', {})
-        if not input_fields:
-            return jsonify({"error": "No input fields provided"}), 400
-
-            # Get temporary conditions for the student
-        student_conditions = temporary_conditions.get(student_id, {})
-
-        # Prepare the document to be saved in MongoDB
+        # Prepare the heart anatomy data
         heart_anatomy_data = {
             "studentId": student_id,
-            "inputFields": input_fields,
-            "conditions": student_conditions
+            "epicardium": data.get("epicardium", ""),
+            "myocardium": data.get("myocardium", ""),
+            "endocardium": data.get("endocardium", ""),
+            "rightAtrium": data.get("rightAtrium", ""),
+            "rightVentricle": data.get("rightVentricle", ""),
+            "leftAtrium": data.get("leftAtrium", ""),
+            "leftVentricle": data.get("leftVentricle", ""),
+            "tricuspidValve": data.get("tricuspidValve", ""),
+            "pulmonaryValve": data.get("pulmonaryValve", ""),
+            "mitralValve": data.get("mitralValve", ""),
+            "aorticValve": data.get("aorticValve", ""),
+            "aorta": data.get("aorta", ""),
+            "pulmonaryArteries": data.get("pulmonaryArteries", ""),
+            "pulmonaryVeins": data.get("pulmonaryVeins", ""),
+            "venaCavae": data.get("venaCavae", ""),
+            "classification": data.get("classification", "")
         }
 
-        # Insert the data into the HeartAnatomy collection
+        # Add temporarily stored conditions for the student
+        if student_id in temporary_conditions:
+            heart_anatomy_data["conditions"] = temporary_conditions[student_id]
+            # Clear the temporary conditions after submission to reset for the next entry
+            del temporary_conditions[student_id]
+        else:
+            heart_anatomy_data["conditions"] = {}
+
+        # Insert the heart anatomy data into the database
         result = HeartAnatomy_collection.insert_one(heart_anatomy_data)
         if result.inserted_id:
-            # Clear temporary conditions for the student after submission
-            if student_id in temporary_conditions:
-                del temporary_conditions[student_id]
-
-            return jsonify({"message": "Main form submitted successfully", "id": str(result.inserted_id)}), 201
+            return jsonify({"message": "Form submitted successfully", "id": str(result.inserted_id)}), 201
         else:
             return jsonify({"error": "Failed to submit data"}), 500
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
-
-
-
 
 
 
