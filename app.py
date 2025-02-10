@@ -610,7 +610,8 @@ def count_unapproved_forms():
     try:
         # Count the number of documents where approvedByDoctor is False
         unapproved_count = HeartAnatomy_collection.count_documents({"approvedByDoctor": False})
-        return jsonify({"unapprovedCount": unapproved_count}), 200
+        # Return the count with the organ name
+        return f"heart {unapproved_count}", 200
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
