@@ -213,7 +213,7 @@ def register_student():
         Student_collection.insert_one(student)
 
         # Send email with login details
-        send_student_email(email, studentname, password)
+        send_student_email(email, email, password)
 
         return jsonify({"message": "Student registered successfully! Login details sent to email."}), 201
 
