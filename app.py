@@ -605,16 +605,21 @@ def submit_form():
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
+
 @app.route('/count_unapproved_forms', methods=['GET'])
 def count_unapproved_forms():
     try:
         # Count the number of documents where approvedByDoctor is False
         unapproved_count = HeartAnatomy_collection.count_documents({"approvedByDoctor": False})
-        # Return the count with the organ name
-        return f"heart {unapproved_count}", 200
+
+        # Create a dictionary with the organ name and count
+        response_data = {"heart": unapproved_count}
+
+        # Return the dictionary as a JSON response
+        return jsonify(response_data), 200
+
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
 
 if __name__ == '__main__':
     app.run(debug=True)
