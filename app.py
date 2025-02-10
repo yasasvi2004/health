@@ -103,13 +103,13 @@ def register_doctor():
             return jsonify({"error": "No input data provided"}), 400
 
         # Validate input data
-        name = data.get('name')
+        doctorname = data.get('doctorname')
         email = data.get('email')
         mobile = data.get('mobile')
         designation = data.get('designation')
         placeOfWork = data.get('placeOfWork')
 
-        if not all([name, email, mobile, designation, placeOfWork]):
+        if not all([doctorname, email, mobile, designation, placeOfWork]):
             return jsonify({"error": "Missing required fields"}), 400
 
         if Doctor_collection.find_one({"email": email}):
@@ -128,7 +128,7 @@ def register_doctor():
 
         # Create a new doctor document
         doctor = {
-            "name": name,
+            "doctorname": doctorname,
             "email": email,
             "mobile": mobile,
             "doctorId": doctorId,
