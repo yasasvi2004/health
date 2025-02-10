@@ -103,22 +103,22 @@ def register_doctor():
             return jsonify({"error": "No input data provided"}), 400
 
         # Validate input data
-        doctorname = data.get('doctorname')
+        name = data.get('name')
         email = data.get('email')
         mobile = data.get('mobile')
-        doctorId = data.get('doctorId')
         designation = data.get('designation')
         placeOfWork = data.get('placeOfWork')
 
-        if not all([doctorname, email, mobile, doctorId, designation, placeOfWork]):
+        if not all([name, email, mobile, designation, placeOfWork]):
             return jsonify({"error": "Missing required fields"}), 400
 
         if Doctor_collection.find_one({"email": email}):
             return jsonify({"error": "Email already registered."}), 400
-        if Doctor_collection.find_one({"doctorId": doctorId}):
-            return jsonify({"error": "Doctor ID already registered."}), 400
 
-
+        # Generate a unique doctor ID
+        doctorId = generate_doctor_id()
+        while Doctor_collection.find_one({"doctorId": doctorId}):
+            doctorId = generate_doctor_id()  # Regenerate if not unique
 
         # Generate a random password
         password = generate_password()
@@ -128,7 +128,7 @@ def register_doctor():
 
         # Create a new doctor document
         doctor = {
-            "doctorname": doctorname,
+            "name": name,
             "email": email,
             "mobile": mobile,
             "doctorId": doctorId,
@@ -146,10 +146,8 @@ def register_doctor():
 
         return jsonify({"message": "Doctor registered successfully! Login details sent to email."}), 201
 
-
     except Exception as e:
         return jsonify({"error": "An error occurred during registration."}), 500
-
 
 
 def generate_student_id():
