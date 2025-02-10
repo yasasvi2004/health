@@ -630,5 +630,40 @@ def count_unapproved_forms():
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
+
+@app.route('/get_unapproved_forms', methods=['GET'])
+def get_unapproved_forms():
+    try:
+        # Fetch all unapproved forms from the HeartAnatomy collection
+        unapproved_forms = HeartAnatomy_collection.find({"approvedByDoctor": False})
+
+        # Prepare the response data
+        response_data = []
+        for form in unapproved_forms:
+            # Fetch student details
+            student = Student_collection.find_one({"studentId": form["studentId"]})
+            if not student:
+                continue  # Skip if student not found
+
+            # Fetch doctor details
+            doctor = Doctor_collection.find_one({"doctorId": student["doctorId"]})
+            if not doctor:
+                continue  # Skip if doctor not found
+
+            # Prepare the card data
+            card_data = {
+                "studentId": student["studentId"],
+                "studentName": student["studentname"],
+                "doctorId": doctor["doctorId"],
+                "doctorName": doctor["doctorname"],
+                "formId": str(form["_id"])  # Convert ObjectId to string
+            }
+            response_data.append(card_data)
+
+        return jsonify(response_data), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)
