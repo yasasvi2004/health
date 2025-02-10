@@ -84,7 +84,12 @@ def send_email(recipient, email, password):
 
 
 
-
+def generate_doctor_id():
+    """Generate a unique doctor ID."""
+    prefix = "DOC"
+    random_number = random.randint(10000, 99999)  # Adjust range as needed
+    doctor_id = f"{prefix}{random_number}"
+    return doctor_id
 
 
 
@@ -98,14 +103,14 @@ def register_doctor():
             return jsonify({"error": "No input data provided"}), 400
 
         # Validate input data
-        name = data.get('name')
+        doctorname = data.get('doctorname')
         email = data.get('email')
         mobile = data.get('mobile')
         doctorId = data.get('doctorId')
         designation = data.get('designation')
         placeOfWork = data.get('placeOfWork')
 
-        if not all([name, email, mobile, doctorId, designation, placeOfWork]):
+        if not all([doctorname, email, mobile, doctorId, designation, placeOfWork]):
             return jsonify({"error": "Missing required fields"}), 400
 
         if Doctor_collection.find_one({"email": email}):
@@ -123,7 +128,7 @@ def register_doctor():
 
         # Create a new doctor document
         doctor = {
-            "name": name,
+            "doctorname": doctorname,
             "email": email,
             "mobile": mobile,
             "doctorId": doctorId,
@@ -162,38 +167,46 @@ def register_student():
             return jsonify({"error": "No input data provided"}), 400
 
         # Validate input data
-        name = data.get('name')
+        studentname = data.get('studentname')
         email = data.get('email')
         phone = data.get('phone')
         college = data.get('college')
         degree = data.get('degree')
+        doctorname = data.get('doctorname')
+        doctorId = data.get('doctorId')
 
-        if not all([name, email, phone, college, degree]):
+        required_fields = [studentname, email, phone, college, degree, doctorname, doctorId]
+        if not all(required_fields):
             return jsonify({"error": "Missing required fields"}), 400
 
-        # Check for existing email in the approved collection
+        # Check for existing email
         if Student_collection.find_one({"email": email}):
             return jsonify({"error": "Email already registered."}), 400
+
+        # Check if the doctor exists
+        doctor = Doctor_collection.find_one({"doctorId": doctorId, "doctorname": doctorname})
+        if not doctor:
+            return jsonify({"error": "Doctor does not exist with the provided ID and name."}), 400
 
         # Generate a unique student ID
         studentId = generate_student_id()
         while Student_collection.find_one({"studentId": studentId}):
             studentId = generate_student_id()  # Regenerate if not unique
 
-        # Generate a random password
+        # Generate a random password and hash it
         password = generate_password()
-
-        # Hash the password
         hashed_password = generate_password_hash(password)
 
         # Create a new student document
         student = {
-            "name": name,
+            "studentname": studentname,
             "email": email,
             "phone": phone,
             "studentId": studentId,
             "college": college,
             "degree": degree,
+            "doctorname": doctorname,
+            "doctorId": doctorId,
             "usertype": "student",
             "password": hashed_password  # Store hashed password
         }
@@ -202,14 +215,12 @@ def register_student():
         Student_collection.insert_one(student)
 
         # Send email with login details
-        send_student_email(email, email, password)
+        send_student_email(email, studentname, password)
 
         return jsonify({"message": "Student registered successfully! Login details sent to email."}), 201
 
     except Exception as e:
         return jsonify({"error": f"An error occurred during registration: {str(e)}"}), 500
-
-
 
 def send_student_email(recipient, email, password):
     """Send an email with student login details."""
@@ -284,7 +295,7 @@ def login():
             return jsonify({
                 "message": "Login successful",
                 "user": {
-                    "name": doctor['name'],
+                    "doctorname": doctor['doctorname'],
                     "email": doctor['email'],
                     "mobile": doctor['mobile'],
                     "doctorId": doctor['doctorId'],
@@ -300,7 +311,7 @@ def login():
             return jsonify({
                 "message": "Login successful",
                 "user": {
-                    "name": student['name'],
+                    "studentname": student['studentname'],
                     "email": student['email'],
                     "phone": student['phone'],
                     "studentId": student['studentId'],
