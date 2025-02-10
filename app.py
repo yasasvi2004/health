@@ -665,5 +665,27 @@ def get_unapproved_forms():
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
+
+@app.route('/fetch_form_details/<form_id>', methods=['GET'])
+def fetch_form_details(form_id):
+    try:
+        # Convert form_id to ObjectId
+        form_object_id = ObjectId(form_id)
+
+        # Fetch the form details from the HeartAnatomy collection
+        form = HeartAnatomy_collection.find_one({"_id": form_object_id})
+        if not form:
+            return jsonify({"error": "Form not found"}), 404
+
+        # Convert ObjectId to string for JSON serialization
+        form["_id"] = str(form["_id"])
+
+        return jsonify(form), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+
 if __name__ == '__main__':
     app.run(debug=True)
