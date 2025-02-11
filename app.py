@@ -11,7 +11,7 @@ from flask_cors import CORS
 import random
 from bson.objectid import ObjectId
 from datetime import datetime
-import jwt
+
 
 
 
@@ -35,7 +35,7 @@ Doctor_collection.create_index("doctorId", unique=True)
 
 Student_collection.create_index("email", unique=True)
 Student_collection.create_index("studentId", unique=True)
-SECRET_KEY = os.urandom(24)
+
 
 
 def generate_admin_credentials():
@@ -648,18 +648,10 @@ def count_forms_by_doctor():
 @app.route('/get_unapproved_forms', methods=['GET'])
 def get_forms_by_doctor():
     try:
-        # Extract the token from the Authorization header
-        auth_header = request.headers.get('Authorization')
-        if not auth_header:
-            return jsonify({"error": "Authorization header is required"}), 401
-
-        # Decode the token to get the doctorId
-        try:
-            token = auth_header.split(" ")[1]  # Assuming the header is "Bearer <token>"
-            decoded_token = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-            doctor_id = decoded_token.get('doctorId')
-        except (IndexError, jwt.ExpiredSignatureError, jwt.InvalidTokenError) as e:
-            return jsonify({"error": f"Invalid or expired token: {str(e)}"}), 401
+        # Get doctorId from query parameters
+        doctor_id = request.args.get('doctorId')
+        if not doctor_id:
+            return jsonify({"error": "doctorId is required"}), 400
 
         # Find all students registered by this doctor
         students = Student_collection.find({"doctorId": doctor_id})
