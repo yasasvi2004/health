@@ -576,6 +576,7 @@ def submit_form():
             return jsonify({"error": "Student not found"}), 404
 
         # Prepare the heart anatomy data with timestamp
+        timestamp = datetime.now()  # Get current date and time
         heart_anatomy_data = {
             "studentId": student_id,
             "epicardium": data.get("epicardium", ""),
@@ -594,8 +595,9 @@ def submit_form():
             "pulmonaryVeins": data.get("pulmonaryVeins", ""),
             "venaCavae": data.get("venaCavae", ""),
             "classification": data.get("classification", ""),
-            "approvedByDoctor": False,  # Default value
-            "timestamp": datetime.now()  # Add current date and time
+
+            "status": "pending",
+            "timestamp": timestamp  # Add current date and time
         }
 
         # Add temporarily stored conditions for the student
@@ -609,55 +611,69 @@ def submit_form():
         # Insert the heart anatomy data into the database
         result = HeartAnatomy_collection.insert_one(heart_anatomy_data)
         if result.inserted_id:
-            return jsonify({"message": "Form submitted successfully", "id": str(result.inserted_id)}), 201
+            return jsonify({
+                "message": "Form submitted successfully",
+                "id": str(result.inserted_id),
+                "timestamp": timestamp  # Return timestamp in the response
+            }), 201
         else:
             return jsonify({"error": "Failed to submit data"}), 500
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
 @app.route('/count_unapproved_forms', methods=['GET'])
-def count_unapproved_forms():
+def count_forms_by_doctor():
     try:
-        # Count the number of documents where approvedByDoctor is False
-        unapproved_count = HeartAnatomy_collection.count_documents({"approvedByDoctor": False})
+        # Get doctorId from query parameters
+        doctor_id = request.args.get('doctorId')
+        if not doctor_id:
+            return jsonify({"error": "doctorId is required"}), 400
 
-        # Create a dictionary with the organ name and count
-        response_data = {"heart": unapproved_count}
+        # Find all students registered by this doctor
+        students = Student_collection.find({"doctorId": doctor_id})
+        student_ids = [student["studentId"] for student in students]
 
-        # Return the dictionary as a JSON response
-        return jsonify(response_data), 200
+        # Count the number of forms associated with these students
+        form_count = HeartAnatomy_collection.count_documents({"studentId": {"$in": student_ids}})
+
+        # Return the count as a JSON response
+        return jsonify({"heart": form_count}), 200
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
 @app.route('/get_unapproved_forms', methods=['GET'])
-def get_unapproved_forms():
+def get_forms_by_doctor():
     try:
-        # Fetch all unapproved forms from the HeartAnatomy collection
-        unapproved_forms = HeartAnatomy_collection.find({"approvedByDoctor": False})
+        # Get doctorId from query parameters
+        doctor_id = request.args.get('doctorId')
+        if not doctor_id:
+            return jsonify({"error": "doctorId is required"}), 400
+
+        # Find all students registered by this doctor
+        students = Student_collection.find({"doctorId": doctor_id})
+        student_ids = [student["studentId"] for student in students]
+
+        # Fetch all forms from the HeartAnatomy collection for these students
+        forms = HeartAnatomy_collection.find({"studentId": {"$in": student_ids}})
 
         # Prepare the response data
         response_data = []
-        for form in unapproved_forms:
+        for form in forms:
             # Fetch student details
             student = Student_collection.find_one({"studentId": form["studentId"]})
             if not student:
                 continue  # Skip if student not found
 
-            # Fetch doctor details
-            doctor = Doctor_collection.find_one({"doctorId": student["doctorId"]})
-            if not doctor:
-                continue  # Skip if doctor not found
-
             # Prepare the card data
             card_data = {
                 "studentId": student["studentId"],
                 "studentName": student["studentname"],
-                "doctorId": doctor["doctorId"],
-                "doctorName": doctor["doctorname"],
-                "formId": str(form["_id"])  # Convert ObjectId to string
+                "doctorId": student["doctorId"],
+                "formId": str(form["_id"]),  # Convert ObjectId to string
+                "timestamp": form.get("timestamp"),  # Include timestamp
+                "status": form.get("status")  # Include form status
             }
             response_data.append(card_data)
 
@@ -665,8 +681,6 @@ def get_unapproved_forms():
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
-
 @app.route('/fetch_form_details/<form_id>', methods=['GET'])
 def fetch_form_details(form_id):
     try:
@@ -682,6 +696,24 @@ def fetch_form_details(form_id):
         form["_id"] = str(form["_id"])
 
         return jsonify(form), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+
+@app.route('/reject_form/<form_id>', methods=['POST'])
+def reject_form(form_id):
+    try:
+        form_object_id = ObjectId(form_id)
+        result = HeartAnatomy_collection.update_one(
+            {"_id": form_object_id},
+            {"$set": {"status": "rejected"}}
+        )
+        if result.modified_count == 1:
+            return jsonify({"message": "Form rejected successfully"}), 200
+        else:
+            return jsonify({"error": "Form not found or already rejected"}), 404
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
