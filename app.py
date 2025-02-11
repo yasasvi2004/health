@@ -294,7 +294,7 @@ def login():
             return jsonify({
                 "message": "Login successful",
                 "user": {
-                    "doctorname": doctor['doctorname'],
+                    "doctorName": doctor['doctorname'],
                     "email": doctor['email'],
                     "mobile": doctor['mobile'],
                     "doctorId": doctor['doctorId'],
