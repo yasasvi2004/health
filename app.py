@@ -10,6 +10,7 @@ import os
 from flask_cors import CORS
 import random
 from bson.objectid import ObjectId
+from datetime import datetime
 
 
 
@@ -126,7 +127,7 @@ def register_doctor():
         # Hash the password
         hashed_password = generate_password_hash(password)
 
-        # Create a new doctor document
+        # Create a new doctor document with timestamp
         doctor = {
             "doctorname": doctorname,
             "email": email,
@@ -135,7 +136,8 @@ def register_doctor():
             "designation": designation,
             "placeOfWork": placeOfWork,
             "usertype": "doctor",
-            "password": hashed_password
+            "password": hashed_password,
+            "timestamp": datetime.now()  # Add current date and time
         }
 
         # Send email with login details
@@ -148,7 +150,6 @@ def register_doctor():
 
     except Exception as e:
         return jsonify({"error": "An error occurred during registration."}), 500
-
 
 def generate_student_id():
     """Generate a unique student ID."""
@@ -195,7 +196,7 @@ def register_student():
         password = generate_password()
         hashed_password = generate_password_hash(password)
 
-        # Create a new student document
+        # Create a new student document with timestamp
         student = {
             "studentname": studentname,
             "email": email,
@@ -206,7 +207,8 @@ def register_student():
             "doctorname": doctorname,
             "doctorId": doctorId,
             "usertype": "student",
-            "password": hashed_password  # Store hashed password
+            "password": hashed_password,
+            "timestamp": datetime.now()  # Add current date and time
         }
 
         # Insert the student into the collection
@@ -219,7 +221,6 @@ def register_student():
 
     except Exception as e:
         return jsonify({"error": f"An error occurred during registration: {str(e)}"}), 500
-
 def send_student_email(recipient, email, password):
     """Send an email with student login details."""
     sender_email = "vutukuridinesh18@gmail.com"
@@ -574,7 +575,7 @@ def submit_form():
         if not student:
             return jsonify({"error": "Student not found"}), 404
 
-        # Prepare the heart anatomy data
+        # Prepare the heart anatomy data with timestamp
         heart_anatomy_data = {
             "studentId": student_id,
             "epicardium": data.get("epicardium", ""),
@@ -593,7 +594,8 @@ def submit_form():
             "pulmonaryVeins": data.get("pulmonaryVeins", ""),
             "venaCavae": data.get("venaCavae", ""),
             "classification": data.get("classification", ""),
-            "approvedByDoctor": False  # Default value
+            "approvedByDoctor": False,  # Default value
+            "timestamp": datetime.now()  # Add current date and time
         }
 
         # Add temporarily stored conditions for the student
@@ -613,7 +615,6 @@ def submit_form():
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
 
 @app.route('/count_unapproved_forms', methods=['GET'])
 def count_unapproved_forms():
