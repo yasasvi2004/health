@@ -726,6 +726,8 @@ def reject_form(form_id):
 def approve_form(form_id):
     try:
         data = request.json
+        print(f"Request Data:{data}")
+
         if not data:
             return jsonify({"error": "No input data provided"}), 400
 
@@ -734,6 +736,7 @@ def approve_form(form_id):
 
         # Fetch the existing form from the database
         existing_form = HeartAnatomy_collection.find_one({"_id": form_object_id})
+        print(existing_form)
         if not existing_form:
             return jsonify({"error": "Form not found"}), 404
 
@@ -756,16 +759,18 @@ def approve_form(form_id):
                 updated_form_data[field] = data[field]
 
         # Update the form in the database
-        result = HeartAnatomy_collection.update_one(
+        print(f"Updating form with ID: {form_object_id} with data: {updated_form_data}")
+        result = HeartAnatomy_collection.update_many(
             {"_id": form_object_id},
             {"$set": updated_form_data}
         )
+        print(f"Update result: {result.modified_count}")
 
-        if result.modified_count == 1:
+        if result.modified_count > 0:
             return jsonify({"message": "Form approved and updated successfully"}), 200
         else:
             return jsonify({"error": "Form not found or no changes made"}), 404
-
+        print(result)
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 if __name__ == '__main__':
