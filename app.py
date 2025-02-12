@@ -768,5 +768,21 @@ def approve_form(form_id):
     except Exception as e:
         print(f"Error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    try:
+        # If you're using server-side sessions, you can clear the session here
+        # For example:
+        # session.clear()
+
+        # Return a success message
+        return jsonify({"message": "Logged out successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": f"An error occurred during logout: {str(e)}"}), 500
+
+
 if __name__ == '__main__':
     app.run(debug=True)
