@@ -745,7 +745,7 @@ def approve_form(form_id):
 
         # Update specific fields if provided in the request
         fields_to_update = [
-            "studentId","epicardium", "myocardium", "endocardium", "rightAtrium", "rightVentricle",
+            "studentId", "epicardium", "myocardium", "endocardium", "rightAtrium", "rightVentricle",
             "leftAtrium", "leftVentricle", "tricuspidValve", "pulmonaryValve",
             "mitralValve", "aorticValve", "aorta", "pulmonaryArteries",
             "pulmonaryVeins", "venaCavae", "classification", "conditions"
