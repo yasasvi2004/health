@@ -725,50 +725,46 @@ def reject_form(form_id):
 @app.route('/approve_form/<form_id>', methods=['POST'])
 def approve_form(form_id):
     try:
-        # Find the existing form in the database
-        existing_form = HeartAnatomy_collection.find_one({"_id": ObjectId(form_id)})
+        data = request.json
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
+
+        # Convert form_id to ObjectId
+        form_object_id = ObjectId(form_id)
+
+        # Fetch the existing form from the database
+        existing_form = HeartAnatomy_collection.find_one({"_id": form_object_id})
         if not existing_form:
             return jsonify({"error": "Form not found"}), 404
 
-        # Get the data from the request (if any)
-        data = request.get_json()
+        # Prepare the updated form data
+        updated_form_data = {
+            "status": "approved",  # Update status to "approved"
+            "timestamp": datetime.now()  # Update timestamp to the current time
+        }
 
-        # Check if request.get_json() returned None (no data in the body)
-        if data is None:
-            data = {}  # Treat it as an empty dictionary
+        # Update specific fields if provided in the request
+        fields_to_update = [
+            "studentId","epicardium", "myocardium", "endocardium", "rightAtrium", "rightVentricle",
+            "leftAtrium", "leftVentricle", "tricuspidValve", "pulmonaryValve",
+            "mitralValve", "aorticValve", "aorta", "pulmonaryArteries",
+            "pulmonaryVeins", "venaCavae", "classification", "conditions"
+        ]
 
-        # If there's data in the request, it means the user has made edits
-        if data:
-            # Update the form data with the new values from the request
-            updated_data = {**existing_form, **data}  # Merge existing and new data
+        for field in fields_to_update:
+            if field in data:
+                updated_form_data[field] = data[field]
 
-            # Update the timestamp
-            updated_data["timestamp"] = datetime.now()
+        # Update the form in the database
+        result = HeartAnatomy_collection.update_one(
+            {"_id": form_object_id},
+            {"$set": updated_form_data}
+        )
 
-            # Update the status to "approved"
-            updated_data["status"] = "approved"
-
-            # Update the form in the database
-            result = HeartAnatomy_collection.update_one(
-                {"_id": ObjectId(form_id)},
-                {"$set": updated_data}
-            )
-
-            if result.modified_count > 0:
-                return jsonify({"message": "Form updated and approved successfully"}), 200
-            else:
-                return jsonify({"error": "Failed to update form"}), 500
+        if result.modified_count == 1:
+            return jsonify({"message": "Form approved and updated successfully"}), 200
         else:
-            # No data in the request, so just update the status to "approved"
-            result = HeartAnatomy_collection.update_one(
-                {"_id": ObjectId(form_id)},
-                {"$set": {"status": "approved"}}
-            )
-
-            if result.modified_count >= 0:
-                return jsonify({"message": "Form approved successfully"}), 200
-            else:
-                return jsonify({"error": "Failed to update status"}), 500
+            return jsonify({"error": "Form not found or no changes made"}), 404
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
