@@ -726,8 +726,7 @@ def reject_form(form_id):
 def approve_form(form_id):
     try:
         data = request.json
-        print(f"Request Data:{data}")
-
+        print(f"Request Data: {data}")
         if not data:
             return jsonify({"error": "No input data provided"}), 400
 
@@ -736,7 +735,7 @@ def approve_form(form_id):
 
         # Fetch the existing form from the database
         existing_form = HeartAnatomy_collection.find_one({"_id": form_object_id})
-        print(existing_form)
+        print(f"Existing Form: {existing_form}")
         if not existing_form:
             return jsonify({"error": "Form not found"}), 404
 
@@ -746,32 +745,28 @@ def approve_form(form_id):
             "timestamp": datetime.now()  # Update timestamp to the current time
         }
 
-        # Update specific fields if provided in the request
-        fields_to_update = [
-            "studentId", "epicardium", "myocardium", "endocardium", "rightAtrium", "rightVentricle",
-            "leftAtrium", "leftVentricle", "tricuspidValve", "pulmonaryValve",
-            "mitralValve", "aorticValve", "aorta", "pulmonaryArteries",
-            "pulmonaryVeins", "venaCavae", "classification", "conditions"
-        ]
+        # Update fields from inputFields if provided
+        if "inputFields" in data:
+            for field, value in data["inputFields"].items():
+                updated_form_data[field] = value
 
-        for field in fields_to_update:
-            if field in data:
-                updated_form_data[field] = data[field]
+        # Update conditions if provided
+        if "conditions" in data:
+            updated_form_data["conditions"] = data["conditions"]
 
         # Update the form in the database
-        print(f"Updating form with ID: {form_object_id} with data: {updated_form_data}")
-        result = HeartAnatomy_collection.update_many(
+        result = HeartAnatomy_collection.update_one(
             {"_id": form_object_id},
             {"$set": updated_form_data}
         )
-        print(f"Update result: {result.modified_count}")
 
-        if result.modified_count > 0:
+        if result.modified_count == 1:
             return jsonify({"message": "Form approved and updated successfully"}), 200
         else:
             return jsonify({"error": "Form not found or no changes made"}), 404
-        print(result)
+
     except Exception as e:
+        print(f"Error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 if __name__ == '__main__':
     app.run(debug=True)
