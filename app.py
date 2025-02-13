@@ -636,8 +636,8 @@ def count_forms_by_doctor():
         student_ids = [student["studentId"] for student in students]
 
         # Count the number of forms associated with these students
-        form_count = HeartAnatomy_collection.count_documents({"studentId": {"$in": student_ids},
-                                                              "status": "pending"})
+        form_count = HeartAnatomy_collection.count_documents({"studentId": {"$in": student_ids}
+                                                            })
 
         # Return the count as a JSON response
         return jsonify({"heart": form_count}), 200
