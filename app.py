@@ -636,7 +636,8 @@ def count_forms_by_doctor():
         student_ids = [student["studentId"] for student in students]
 
         # Count the number of forms associated with these students
-        form_count = HeartAnatomy_collection.count_documents({"studentId": {"$in": student_ids}})
+        form_count = HeartAnatomy_collection.count_documents({"studentId": {"$in": student_ids},
+                                                              "status": "pending"})
 
         # Return the count as a JSON response
         return jsonify({"heart": form_count}), 200
@@ -770,18 +771,6 @@ def approve_form(form_id):
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-
-@app.route('/logout', methods=['POST'])
-def logout():
-    try:
-        # If you're using server-side sessions, you can clear the session here
-        # For example:
-        # session.clear()
-
-        # Return a success message
-        return jsonify({"message": "Logged out successfully"}), 200
-    except Exception as e:
-        return jsonify({"error": f"An error occurred during logout: {str(e)}"}), 500
 
 
 if __name__ == '__main__':
