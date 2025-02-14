@@ -642,11 +642,13 @@ def count_forms_by_doctor():
         student_ids = [student["studentId"] for student in students]
 
         # Count the number of forms associated with these students
-        form_count = HeartAnatomy_collection.count_documents({"studentId": {"$in": student_ids},
-                                                              "status": "pending"})
+        form_count = organs_collection.count_documents({
+            "studentId": {"$in": student_ids},
+            "status": "pending"
+        })
 
         # Return the count as a JSON response
-        return jsonify({"heart": form_count}), 200
+        return jsonify({"organ": form_count}), 200
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
@@ -664,8 +666,11 @@ def get_forms_by_doctor():
         students = Student_collection.find({"doctorId": doctor_id})
         student_ids = [student["studentId"] for student in students]
 
-        # Fetch all forms from the HeartAnatomy collection for these students
-        forms = HeartAnatomy_collection.find({"studentId": {"$in": student_ids}})
+        # Fetch all forms from the Organs collection for these students
+        forms = organs_collection.find({
+            "studentId": {"$in": student_ids},
+            "status": "pending"
+        })
 
         # Prepare the response data
         response_data = []
@@ -682,7 +687,8 @@ def get_forms_by_doctor():
                 "doctorId": student["doctorId"],
                 "formId": str(form["_id"]),  # Convert ObjectId to string
                 "timestamp": form.get("timestamp"),  # Include timestamp
-                "status": form.get("status")  # Include form status
+                "status": form.get("status"),  # Include form status
+                "organ": form.get("organ")  # Include organ name
             }
             response_data.append(card_data)
 
@@ -696,8 +702,8 @@ def fetch_form_details(form_id):
         # Convert form_id to ObjectId
         form_object_id = ObjectId(form_id)
 
-        # Fetch the form details from the HeartAnatomy collection
-        form = HeartAnatomy_collection.find_one({"_id": form_object_id})
+        # Fetch the form details from the Organs collection
+        form = organs_collection.find_one({"_id": form_object_id})
         if not form:
             return jsonify({"error": "Form not found"}), 404
 
@@ -710,12 +716,11 @@ def fetch_form_details(form_id):
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-
 @app.route('/reject_form/<form_id>', methods=['POST'])
 def reject_form(form_id):
     try:
         form_object_id = ObjectId(form_id)
-        result = HeartAnatomy_collection.update_one(
+        result = organs_collection.update_one(
             {"_id": form_object_id},
             {"$set": {"status": "rejected"}}
         )
@@ -728,12 +733,10 @@ def reject_form(form_id):
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-
 @app.route('/approve_form/<form_id>', methods=['POST'])
 def approve_form(form_id):
     try:
         data = request.json
-        print(f"Request Data: {data}")
         if not data:
             return jsonify({"error": "No input data provided"}), 400
 
@@ -741,8 +744,7 @@ def approve_form(form_id):
         form_object_id = ObjectId(form_id)
 
         # Fetch the existing form from the database
-        existing_form = HeartAnatomy_collection.find_one({"_id": form_object_id})
-        print(f"Existing Form: {existing_form}")
+        existing_form = organs_collection.find_one({"_id": form_object_id})
         if not existing_form:
             return jsonify({"error": "Form not found"}), 404
 
@@ -762,7 +764,7 @@ def approve_form(form_id):
             updated_form_data["conditions"] = data["conditions"]
 
         # Update the form in the database
-        result = HeartAnatomy_collection.update_one(
+        result = organs_collection.update_one(
             {"_id": form_object_id},
             {"$set": updated_form_data}
         )
@@ -773,7 +775,6 @@ def approve_form(form_id):
             return jsonify({"error": "Form not found or no changes made"}), 404
 
     except Exception as e:
-        print(f"Error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
