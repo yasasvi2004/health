@@ -641,18 +641,27 @@ def count_forms_by_doctor():
         students = Student_collection.find({"doctorId": doctor_id})
         student_ids = [student["studentId"] for student in students]
 
-        # Count the number of forms associated with these students
-        form_count = organs_collection.count_documents({
+        # Fetch all pending forms for these students
+        forms = organs_collection.find({
             "studentId": {"$in": student_ids},
             "status": "pending"
         })
 
-        # Return the count as a JSON response
-        return jsonify({"organ": form_count}), 200
+        # Group forms by organ type
+        organ_counts = {}
+        for form in forms:
+            organ = form.get("organ")
+            if organ:
+                if organ in organ_counts:
+                    organ_counts[organ] += 1
+                else:
+                    organ_counts[organ] = 1
+
+        # Return the organ counts as a JSON response
+        return jsonify(organ_counts), 200
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
 
 @app.route('/get_unapproved_forms', methods=['GET'])
 def get_forms_by_doctor():
@@ -688,7 +697,7 @@ def get_forms_by_doctor():
                 "formId": str(form["_id"]),  # Convert ObjectId to string
                 "timestamp": form.get("timestamp"),  # Include timestamp
                 "status": form.get("status"),  # Include form status
-                "organ": form.get("organ")  # Include organ name
+                "organ": form.get("organ")  # Include organ type
             }
             response_data.append(card_data)
 
@@ -696,6 +705,7 @@ def get_forms_by_doctor():
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
 @app.route('/fetch_form_details/<form_id>', methods=['GET'])
 def fetch_form_details(form_id):
     try:
@@ -715,7 +725,6 @@ def fetch_form_details(form_id):
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
-
 @app.route('/reject_form/<form_id>', methods=['POST'])
 def reject_form(form_id):
     try:
@@ -732,11 +741,11 @@ def reject_form(form_id):
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
-
 @app.route('/approve_form/<form_id>', methods=['POST'])
 def approve_form(form_id):
     try:
         data = request.json
+        print(f"Request Data: {data}")
         if not data:
             return jsonify({"error": "No input data provided"}), 400
 
@@ -745,6 +754,7 @@ def approve_form(form_id):
 
         # Fetch the existing form from the database
         existing_form = organs_collection.find_one({"_id": form_object_id})
+        print(f"Existing Form: {existing_form}")
         if not existing_form:
             return jsonify({"error": "Form not found"}), 404
 
@@ -775,9 +785,8 @@ def approve_form(form_id):
             return jsonify({"error": "Form not found or no changes made"}), 404
 
     except Exception as e:
+        print(f"Error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
-
 
 
 if __name__ == '__main__':
