@@ -26,7 +26,6 @@ Doctor_collection=db['Doctor']
 Student_collection = db['Student']
 HeartAnatomy_collection = db['HeartAnatomy']
 
-
 CORS(app)
 
 
@@ -507,57 +506,40 @@ def reset_password_with_otp():
 # Temporary storage for conditions (in-memory, replace with a database in production)
 temporary_conditions = {}
 
-organs_structure = {
-    "heart": {
-        "parts": [
-            "epicardium", "myocardium", "endocardium", "rightAtrium", "rightVentricle",
-            "leftAtrium", "leftVentricle", "tricuspidValve", "pulmonaryValve",
-            "mitralValve", "aorticValve", "aorta", "pulmonaryArteries", "pulmonaryVeins",
-            "venaCavae", "classification"
-        ]
-    }
-}
 
-def validate_organ(organ):
-    """Check if the organ exists in the organs_structure dictionary."""
-    if organ.lower() not in organs_structure:
-        return False
-    return True
-
-def get_collection(organ):
-    """Get the collection for the specified organ."""
-    collection_name = organs_structure.get(organ, {}).get("collection")
-    if not collection_name:
-        raise ValueError(f"Collection not defined for organ: {organ}")
-    return db[collection_name]
-
-@app.route('/add_condition/<organ>', methods=['POST'])
-def add_condition(organ):
+@app.route('/add_condition', methods=['POST'])
+def add_condition():
     try:
-        # Validate organ name
-        if not validate_organ(organ):
-            return jsonify({"error": f"Invalid organ: {organ}"}), 400
-
         data = request.json
         if not data:
             return jsonify({"error": "No input data provided"}), 400
 
         student_id = data.get('studentId')
-        if not student_id:
-            return jsonify({"error": "Student ID is required"}), 400
 
+        # Heart parts to check
+        heart_parts = [
+            "addEpicardium", "addMyocardium", "addEndocardium",
+            "addRightAtrium", "addRightVentricle", "addLeftAtrium",
+            "addLeftVentricle", "addTricuspidValve", "addPulmonaryValve",
+            "addMitralValve", "addAorticValve", "addAorta",
+            "addPulmonaryArteries", "addPulmonaryVeins", "addVenaCavae",
+            "addClassification"
+        ]
+
+        # Check if the student exists
         student = Student_collection.find_one({"studentId": student_id})
         if not student:
             return jsonify({"error": "Student not found"}), 404
 
+            # Initialize temporary storage for the student if not exists
         if student_id not in temporary_conditions:
             temporary_conditions[student_id] = {}
 
-        organ_parts = organs_structure.get(organ, {}).get("parts", [])
-        for part in organ_parts:
-            part_key = f"add{part[0].upper()}{part[1:]}"
-            if part_key in data:
-                for condition in data[part_key]:
+            # Process each heart part in the payload
+        for heart_part in heart_parts:
+            if heart_part in data:  # Check if the heart part exists in the incoming data
+                for condition in data[heart_part]:
+                    # Create condition entry
                     condition_entry = {
                         "clinicalCondition": condition.get('clinicalCondition', ''),
                         "symptoms": condition.get('symptoms', ''),
@@ -565,72 +547,82 @@ def add_condition(organ):
                         "clinicalObservations": condition.get('clinicalObservations', '')
                     }
 
-                    if part not in temporary_conditions[student_id]:
-                        temporary_conditions[student_id][part] = []
+                    # If this heart part is not already in temporary storage, initialize it
+                    if heart_part not in temporary_conditions[student_id]:
+                        temporary_conditions[student_id][heart_part] = []
 
-                    temporary_conditions[student_id][part].append(condition_entry)
+                        # Add the condition to temporary storage for the specific heart part
+                    temporary_conditions[student_id][heart_part].append(condition_entry)
 
-        return jsonify({"message": f"Conditions added successfully for {organ}"}), 201
+        return jsonify({"message": "Conditions added successfully"}), 201
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-@app.route('/submit_form/<organ>', methods=['POST'])
-def submit_form(organ):
-    try:
-        # Validate organ name
-        if not validate_organ(organ):
-            return jsonify({"error": f"Invalid organ: {organ}"}), 400
 
+
+@app.route('/submit_form', methods=['POST'])
+def submit_form():
+    try:
         data = request.json
         if not data:
             return jsonify({"error": "No input data provided"}), 400
 
         student_id = data.get('studentId')
+        # Validate student ID existence
         if not student_id:
             return jsonify({"error": "Student ID is required"}), 400
 
+        # Check if student exists
         student = Student_collection.find_one({"studentId": student_id})
         if not student:
             return jsonify({"error": "Student not found"}), 404
 
-        timestamp = datetime.now()
-        organ_data = {
+        # Prepare the heart anatomy data with timestamp
+        timestamp = datetime.now()  # Get current date and time
+        heart_anatomy_data = {
             "studentId": student_id,
+            "epicardium": data.get("epicardium", ""),
+            "myocardium": data.get("myocardium", ""),
+            "endocardium": data.get("endocardium", ""),
+            "rightAtrium": data.get("rightAtrium", ""),
+            "rightVentricle": data.get("rightVentricle", ""),
+            "leftAtrium": data.get("leftAtrium", ""),
+            "leftVentricle": data.get("leftVentricle", ""),
+            "tricuspidValve": data.get("tricuspidValve", ""),
+            "pulmonaryValve": data.get("pulmonaryValve", ""),
+            "mitralValve": data.get("mitralValve", ""),
+            "aorticValve": data.get("aorticValve", ""),
+            "aorta": data.get("aorta", ""),
+            "pulmonaryArteries": data.get("pulmonaryArteries", ""),
+            "pulmonaryVeins": data.get("pulmonaryVeins", ""),
+            "venaCavae": data.get("venaCavae", ""),
+            "classification": data.get("classification", ""),
+
             "status": "pending",
-            "timestamp": timestamp
+            "timestamp": timestamp  # Add current date and time
         }
 
-        # Add organ-specific data
-        organ_parts = organs_structure.get(organ, {}).get("parts", [])
-        for part in organ_parts:
-            organ_data[part] = data.get(part, "")
-
-        # Add conditions if they exist
+        # Add temporarily stored conditions for the student
         if student_id in temporary_conditions:
-            organ_data["conditions"] = temporary_conditions[student_id]
+            heart_anatomy_data["conditions"] = temporary_conditions[student_id]
+            # Clear the temporary conditions after submission to reset for the next entry
             del temporary_conditions[student_id]
         else:
-            organ_data["conditions"] = {}
+            heart_anatomy_data["conditions"] = {}
 
-        # Get the collection for the specified organ
-        collection = get_collection(organ)
-        result = collection.insert_one(organ_data)
+        # Insert the heart anatomy data into the database
+        result = HeartAnatomy_collection.insert_one(heart_anatomy_data)
         if result.inserted_id:
             return jsonify({
-                "message": f"Form submitted successfully for {organ}",
+                "message": "Form submitted successfully",
                 "id": str(result.inserted_id),
-                "timestamp": timestamp
+                "timestamp": timestamp  # Return timestamp in the response
             }), 201
         else:
             return jsonify({"error": "Failed to submit data"}), 500
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
-
-
-
-
 @app.route('/count_unapproved_forms', methods=['GET'])
 def count_forms_by_doctor():
     try:
