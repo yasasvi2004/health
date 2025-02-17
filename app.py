@@ -574,6 +574,7 @@ def add_condition(organ):
 
                     temporary_conditions[student_id][part_key].append(condition_entry)
 
+        print(f"Temporary conditions after adding for {student_id}: {temporary_conditions}")  # Debug log
         return jsonify({"message": f"Conditions added successfully for {organ}"}), 201
 
     except Exception as e:
@@ -606,7 +607,7 @@ def submit_form(organ):
             "timestamp": timestamp
         }
 
-        # Add organ-specific data
+
         # Add organ-specific data
         organ_parts = organs_structure.get(organ, {}).get("parts", [])
         organ_data["inputfields"] = {part: data.get(part, "") for part in organ_parts}
@@ -767,8 +768,8 @@ def approve_form(form_id):
         }
 
         # Update fields from inputFields if provided
-        if "inputFields" in data:
-            for field, value in data["inputFields"].items():
+        if "inputfields" in data:
+            for field, value in data["inputfields"].items():
                 updated_form_data[field] = value
 
         # Update conditions if provided
