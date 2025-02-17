@@ -558,7 +558,7 @@ def add_condition(organ):
 
         organ_parts = organs_structure.get(organ, {}).get("parts", [])
         for part in organ_parts:
-            part_key = f"add{part[0].upper()}{part[1:]}"
+            part_key = f"add{part[0].upper()}{part[1:]}"  # This creates addEpicardium, etc.
             if part_key in data:
                 for condition in data[part_key]:
                     condition_entry = {
@@ -607,8 +607,9 @@ def submit_form(organ):
         }
 
         # Add organ-specific data
+        # Add organ-specific data
         organ_parts = organs_structure.get(organ, {}).get("parts", [])
-        organ_data["data"] = {part: data.get(part, "") for part in organ_parts}
+        organ_data["inputfields"] = {part: data.get(part, "") for part in organ_parts}
 
         # Add conditions if they exist
         if student_id in temporary_conditions:
