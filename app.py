@@ -680,8 +680,7 @@ def get_forms_by_doctor():
 
         # Fetch all forms from the Organs collection for these students
         forms = organs_collection.find({
-            "studentId": {"$in": student_ids},
-            "status": "pending"
+            "studentId": {"$in": student_ids}
         })
 
         # Prepare the response data
@@ -731,11 +730,24 @@ def fetch_form_details(form_id):
 @app.route('/reject_form/<form_id>', methods=['POST'])
 def reject_form(form_id):
     try:
+        # Convert form_id to ObjectId
         form_object_id = ObjectId(form_id)
+
+        # Check if the form exists
+        existing_form = organs_collection.find_one({"_id": form_object_id})
+        if not existing_form:
+            return jsonify({"error": "Form not found"}), 404
+
+        # Update the form status to "rejected"
         result = organs_collection.update_one(
             {"_id": form_object_id},
             {"$set": {"status": "rejected"}}
         )
+
+        # Log the updated form for debugging
+        updated_form = organs_collection.find_one({"_id": form_object_id})
+        print(f"Updated Form (Rejected): {updated_form}")
+
         if result.modified_count == 1:
             return jsonify({"message": "Form rejected successfully"}), 200
         else:
@@ -747,6 +759,7 @@ def reject_form(form_id):
 @app.route('/approve_form/<form_id>', methods=['POST'])
 def approve_form(form_id):
     try:
+        # Get request data
         data = request.json
         print(f"Request Data: {data}")
         if not data:
@@ -782,6 +795,10 @@ def approve_form(form_id):
             {"$set": updated_form_data}
         )
 
+        # Log the updated form for debugging
+        updated_form = organs_collection.find_one({"_id": form_object_id})
+        print(f"Updated Form (Approved): {updated_form}")
+
         if result.modified_count == 1:
             return jsonify({"message": "Form approved and updated successfully"}), 200
         else:
@@ -790,7 +807,6 @@ def approve_form(form_id):
     except Exception as e:
         print(f"Error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
 
 if __name__ == '__main__':
     app.run(debug=True)
