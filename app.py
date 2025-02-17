@@ -568,10 +568,11 @@ def add_condition(organ):
                         "clinicalObservations": condition.get('clinicalObservations', '')
                     }
 
-                    if part not in temporary_conditions[student_id]:
-                        temporary_conditions[student_id][part] = []
+                    # Use part_key (e.g., addEpicardium) for storage
+                    if part_key not in temporary_conditions[student_id]:
+                        temporary_conditions[student_id][part_key] = []
 
-                    temporary_conditions[student_id][part].append(condition_entry)
+                    temporary_conditions[student_id][part_key].append(condition_entry)
 
         return jsonify({"message": f"Conditions added successfully for {organ}"}), 201
 
