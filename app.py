@@ -524,7 +524,15 @@ organs_structure = {
                 "amygdala", "hippocampus", "thalamus", "corpusCallosum",
                 "basalGanglia", "ventricles", "classification"
             ]
-        }
+        },
+    "spinalcord": {
+                "parts": [
+                    "cervicalRegion", "thoracicRegion", "lumbarRegion", "sacralRegion",
+                    "coccygealRegion", "grayMatter", "whiteMatter", "dorsalRoot",
+                    "ventralRoot", "vertebralColumn", "meninges", "cerebrospinalFluid",
+                    "classification"
+                ]
+            }
     # Add more organs as needed
 }
 
