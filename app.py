@@ -643,20 +643,8 @@ def submit_form(organ):
 @app.route('/count_unapproved_forms', methods=['GET'])
 def count_forms_by_doctor():
     try:
-        # Get doctorId from query parameters
-        doctor_id = request.args.get('doctorId')
-        if not doctor_id:
-            return jsonify({"error": "doctorId is required"}), 400
-
-        # Find all students registered by this doctor
-        students = Student_collection.find({"doctorId": doctor_id})
-        student_ids = [student["studentId"] for student in students]
-
-        # Fetch all pending forms for these students
-        forms = organs_collection.find({
-            "studentId": {"$in": student_ids},
-            "status": "pending"
-        })
+        # Fetch all forms with status "pending" from the Organs collection
+        forms = organs_collection.find({"status": "pending"})
 
         # Group forms by organ type
         organ_counts = {}
@@ -677,19 +665,8 @@ def count_forms_by_doctor():
 @app.route('/get_unapproved_forms', methods=['GET'])
 def get_forms_by_doctor():
     try:
-        # Get doctorId from query parameters
-        doctor_id = request.args.get('doctorId')
-        if not doctor_id:
-            return jsonify({"error": "doctorId is required"}), 400
-
-        # Find all students registered by this doctor
-        students = Student_collection.find({"doctorId": doctor_id})
-        student_ids = [student["studentId"] for student in students]
-
-        # Fetch all forms from the Organs collection for these students
-        forms = organs_collection.find({
-            "studentId": {"$in": student_ids}
-        })
+        # Fetch all forms with status "pending" from the Organs collection
+        forms = organs_collection.find({"status":  {"$in": ["pending", "approved","rejected"]}})
 
         # Prepare the response data
         response_data = []
