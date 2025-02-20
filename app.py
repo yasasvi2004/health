@@ -812,10 +812,18 @@ def submit_form(organ):
             "timestamp": timestamp
         }
 
-
-        # Add organ-specific data
+        # Add organ-specific text fields
         organ_parts = organs_structure.get(organ, {}).get("parts", [])
         organ_data["inputfields"] = {part: data.get(part, "") for part in organ_parts}
+
+        # Add Base64-encoded image fields
+        image_fields = {}
+        for part in organ_parts:
+            image_field = f"{part}Image"  # e.g., cervicalRegionImage
+            if image_field in data:
+                image_fields[image_field] = data[image_field]  # Store Base64-encoded image
+
+        organ_data["images"] = image_fields  # Add images to the organ data
 
         # Add conditions if they exist
         if student_id in temporary_conditions:
