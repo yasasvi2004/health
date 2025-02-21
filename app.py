@@ -872,7 +872,7 @@ def submit_form(organ):
             # Store text field
             input_fields[part] = data.get(part, "")
 
-            # Store Base64-encoded image field
+            # Store Base64-encoded image field (if provided)
             image_field = f"{part}Image"
             if image_field in data:
                 if not is_valid_base64(data[image_field]):
@@ -883,7 +883,7 @@ def submit_form(organ):
                 if not public_url:
                     return jsonify({"error": f"Failed to upload {image_field} to S3"}), 500
 
-                # Store the public URL instead of the S3 object key
+                # Store the public URL for the specific image field
                 input_fields[image_field] = public_url
 
         organ_data["inputfields"] = input_fields
