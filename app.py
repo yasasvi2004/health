@@ -891,8 +891,9 @@ def submit_form(organ):
         input_fields = {}
 
         for part in organ_parts:
-            # Store text field
-            input_fields[part] = data.get(part, "")
+            # Store text field (if provided)
+            if part in data:
+                input_fields[part] = data.get(part, "")
 
             # Store Base64-encoded image field (if provided)
             image_field = f"{part}Image"
