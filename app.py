@@ -25,7 +25,6 @@ client = MongoClient(uri)
 db=client.get_database('Health')
 Doctor_collection=db['Doctor']
 Student_collection = db['Student']
-HeartAnatomy_collection = db['HeartAnatomy']
 organs_collection = db['Organs']
 
 CORS(app)
@@ -809,13 +808,17 @@ def submit_form(organ):
         if not student_id:
             return jsonify({"error": "Student ID is required"}), 400
 
+        # Check database connection
+        if Student_collection is None or organs_collection is None:
+            return jsonify({"error": "Database connection failed"}), 500
+
         student = Student_collection.find_one({"studentId": student_id})
         if not student:
             return jsonify({"error": "Student not found"}), 404
 
         timestamp = datetime.now()
         organ_data = {
-            "organ": organ,  # Store the organ name
+            "organ": organ,
             "studentId": student_id,
             "status": "pending",
             "timestamp": timestamp
@@ -836,7 +839,6 @@ def submit_form(organ):
                     return jsonify({"error": f"Invalid Base64 data in {image_field}"}), 400
                 input_fields[image_field] = data[image_field]
 
-        # Store both text fields and image fields in inputfields
         organ_data["inputfields"] = input_fields
 
         # Add conditions if they exist
@@ -863,6 +865,7 @@ def submit_form(organ):
             return jsonify({"error": "Failed to submit data"}), 500
 
     except Exception as e:
+        print("Error:", str(e))
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 @app.route('/count_unapproved_forms', methods=['GET'])
 def count_forms_by_doctor():
