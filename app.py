@@ -74,9 +74,30 @@ def upload_base64_to_s3(base64_data, file_name):
         unique_id = str(uuid.uuid4())
         s3_key = f"uploads/{unique_id}_{file_name}"
 
+        # Debug: Print the S3 key
+        print(f"Uploading file: {s3_key}")
+
+        # Determine the MIME type based on the file extension
+        if file_name.lower().endswith('.jpg') or file_name.lower().endswith('.jpeg'):
+            content_type = 'image/jpeg'
+        elif file_name.lower().endswith('.png'):
+            content_type = 'image/png'
+        elif file_name.lower().endswith('.gif'):
+            content_type = 'image/gif'
+        else:
+            content_type = 'binary/octet-stream'  # Default MIME type
 
         # Upload to S3 with the correct MIME type and make it publicly accessible
+        s3.put_object(
+            Bucket=bucket_name,
+            Key=s3_key,
+            Body=file_data,
+            ContentType=content_type,  # Set the MIME type
+            ACL='public-read'  # Make the object publicly readable
+        )
 
+        # Debug: Confirm the upload
+        print(f"File uploaded successfully: {s3_key}")
 
         # Generate the public URL
         public_url = f"https://{bucket_name}.s3.{s3.meta.region_name}.amazonaws.com/{s3_key}"
@@ -85,6 +106,7 @@ def upload_base64_to_s3(base64_data, file_name):
         return public_url
     except Exception as e:
         print(f"Error uploading to S3: {str(e)}")
+        print(f"Bucket: {bucket_name}, Key: {s3_key}")
         return None
 
 generate_admin_credentials()
