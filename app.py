@@ -770,7 +770,13 @@ def add_condition(organ):
                         "clinicalCondition": condition.get('clinicalCondition', ''),
                         "symptoms": condition.get('symptoms', ''),
                         "signs": condition.get('signs', ''),
-                        "clinicalObservations": condition.get('clinicalObservations', '')
+                        "clinicalObservations": condition.get('clinicalObservations', ''),
+                        "bloodTests": condition.get('bloodTests',''),
+                        "urineTests": condition.get('urineTests',''),
+                        "heartRate": condition.get('heartRate',''),
+                        "bloodPressure": condition.get('bloodPressure',''),
+                        "xRays":condition.get('xRays','') ,
+                        "mriScans": condition.get('mriScans','')
                     }
 
                     # Use part_key (e.g., addEpicardium) for storage
@@ -1019,6 +1025,5 @@ def approve_form(form_id):
     except Exception as e:
         print(f"Error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
 if __name__ == '__main__':
     app.run(debug=True)
