@@ -12,6 +12,10 @@ import random
 from bson.objectid import ObjectId
 from datetime import datetime
 import base64
+import boto3
+from botocore.exceptions import NoCredentialsError
+import uuid
+from dotenv import load_dotenv
 
 
 
@@ -52,6 +56,32 @@ def generate_admin_credentials():
     # For demonstration purposes, print the credentials
     print(f"Admin credentials - Username: {username}, Password: {password}")
 
+
+load_dotenv()
+# Initialize the S3 client
+s3= boto3.client('s3', aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+    region_name='eu-north-1'
+)
+
+bucket_name = 'images09876'
+def upload_base64_to_s3(base64_data, file_name):
+    try:
+        # Decode the Base64 data
+        file_data = base64.b64decode(base64_data)
+
+        # Generate a unique file name
+        unique_id = str(uuid.uuid4())
+        s3_key = f"uploads/{unique_id}_{file_name}"
+
+        # Upload to S3
+        s3.put_object(Bucket=bucket_name, Key=s3_key, Body=file_data)
+
+        # Return the S3 object key
+        return s3_key
+    except Exception as e:
+        print(f"Error uploading to S3: {str(e)}")
+        return None
 
 generate_admin_credentials()
 
@@ -843,7 +873,14 @@ def submit_form(organ):
             if image_field in data:
                 if not is_valid_base64(data[image_field]):
                     return jsonify({"error": f"Invalid Base64 data in {image_field}"}), 400
-                input_fields[image_field] = data[image_field]
+
+                s3_key = upload_base64_to_s3(data[image_field], f"{part}.jpg")
+                if not s3_key:
+                    return jsonify({"error": f"Failed to upload {image_field} to S3"}), 500
+
+                # Store the S3 object key instead of the Base64 data
+                input_fields[image_field] = s3_key
+
 
         organ_data["inputfields"] = input_fields
 
