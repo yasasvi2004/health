@@ -11,6 +11,7 @@ from flask_cors import CORS
 import random
 from bson.objectid import ObjectId
 from datetime import datetime
+import base64
 
 
 
@@ -785,6 +786,14 @@ def add_condition(organ):
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
+
+
+def is_valid_base64(data):
+    try:
+        base64.b64decode(data, validate=True)
+        return True
+    except Exception:
+        return False
 @app.route('/submit_form/<organ>', methods=['POST'])
 def submit_form(organ):
     try:
@@ -812,9 +821,7 @@ def submit_form(organ):
             "timestamp": timestamp
         }
 
-        # Add organ-specific text fields
-
-        # Add organ-specific text fields
+        # Add organ-specific text fields and image fields
         organ_parts = organs_structure.get(organ, {}).get("parts", [])
         input_fields = {}
 
@@ -825,11 +832,12 @@ def submit_form(organ):
             # Store Base64-encoded image field
             image_field = f"{part}Image"
             if image_field in data:
+                if not is_valid_base64(data[image_field]):
+                    return jsonify({"error": f"Invalid Base64 data in {image_field}"}), 400
                 input_fields[image_field] = data[image_field]
 
         # Store both text fields and image fields in inputfields
         organ_data["inputfields"] = input_fields
-        # Add images to the organ data
 
         # Add conditions if they exist
         if student_id in temporary_conditions:
@@ -838,8 +846,13 @@ def submit_form(organ):
         else:
             organ_data["conditions"] = {}
 
+        # Log the data to be inserted
+        print("Organ Data to be inserted:", organ_data)
+
         # Insert the form into the Organs collection
         result = organs_collection.insert_one(organ_data)
+        print("Insertion result:", result.inserted_id)
+
         if result.inserted_id:
             return jsonify({
                 "message": f"Form submitted successfully for {organ}",
