@@ -895,9 +895,9 @@ def submit_form(organ):
             if part in data:
                 input_fields[part] = data.get(part, "")
 
-            # Store Base64-encoded image field (if provided)
+            # Store Base64-encoded image field (if provided and valid)
             image_field = f"{part}Image"
-            if image_field in data:
+            if image_field in data and data[image_field]:  # Check if the field exists and is not empty
                 if not is_valid_base64(data[image_field]):
                     return jsonify({"error": f"Invalid Base64 data in {image_field}"}), 400
 
