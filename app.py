@@ -962,8 +962,8 @@ def count_forms_by_doctor():
 @app.route('/get_unapproved_forms', methods=['GET'])
 def get_forms_by_doctor():
     try:
-        # Fetch all forms with status "pending" from the Organs collection
-        forms = organs_collection.find({"status":  {"$in": ["pending", "approved","rejected"]}})
+        # Fetch all forms with status "pending", "approved", or "rejected"
+        forms = organs_collection.find({"status": {"$in": ["pending", "approved", "rejected"]}})
 
         # Prepare the response data
         response_data = []
@@ -979,7 +979,9 @@ def get_forms_by_doctor():
                 "studentName": student["studentname"],
                 "doctorId": student["doctorId"],
                 "formId": str(form["_id"]),  # Convert ObjectId to string
-                "timestamp": form.get("timestamp"),  # Include timestamp
+                "timestamp": form.get("timestamp"),  # Include submission timestamp
+                "approved_timestamp": form.get("approved_timestamp"),  # Include approval timestamp
+                "rejected_timestamp": form.get("rejected_timestamp"),  # Include rejection timestamp
                 "status": form.get("status"),  # Include form status
                 "organ": form.get("organ")  # Include organ type
             }
@@ -1004,7 +1006,14 @@ def fetch_form_details(form_id):
         # Convert ObjectId to string for JSON serialization
         form["_id"] = str(form["_id"])
 
-        return jsonify(form), 200
+        # Include approval/rejection timestamps in the response
+        response_data = {
+            **form,
+            "approved_timestamp": form.get("approved_timestamp"),
+            "rejected_timestamp": form.get("rejected_timestamp")
+        }
+
+        return jsonify(response_data), 200
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
@@ -1020,10 +1029,10 @@ def reject_form(form_id):
         if not existing_form:
             return jsonify({"error": "Form not found"}), 404
 
-        # Update the form status to "rejected"
+        # Update the form status to "rejected" and add rejection timestamp
         result = organs_collection.update_one(
             {"_id": form_object_id},
-            {"$set": {"status": "rejected"}}
+            {"$set": {"status": "rejected", "rejected_timestamp": datetime.now()}}
         )
 
         # Log the updated form for debugging
@@ -1059,7 +1068,7 @@ def approve_form(form_id):
         # Prepare the updated form data
         updated_form_data = {
             "status": "approved",  # Update status to "approved"
-            "timestamp": datetime.now()  # Update timestamp to the current time
+            "approved_timestamp": datetime.now()  # Add approval timestamp
         }
 
         # Update fields from inputFields if provided
@@ -1090,48 +1099,47 @@ def approve_form(form_id):
         print(f"Error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
+@app.route('/get_all_doctors', methods=['GET'])
+def get_all_doctors():
+    try:
+        # Fetch all doctors from the Doctor collection
+        doctors = Doctor_collection.find({}, {"doctorname": 1, "email": 1, "doctorId": 1, "_id": 0})
 
-# @app.route('/get_all_doctors', methods=['GET'])
-# def get_all_doctors():
-#     try:
-#         # Fetch all doctors from the Doctor collection
-#         doctors = Doctor_collection.find({}, {"doctorname": 1, "email": 1, "doctorId": 1, "_id": 0})
-#
-#         # Prepare the response data
-#         doctors_list = []
-#         for doctor in doctors:
-#             doctors_list.append({
-#                 "name": doctor["doctorname"],
-#                 "email": doctor["email"],
-#                 "doctorId": doctor["doctorId"]  # Include doctorId
-#             })
-#
-#         return jsonify(doctors_list), 200
-#
-#     except Exception as e:
-#         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-#
-#
-#
-# @app.route('/get_all_students', methods=['GET'])
-# def get_all_students():
-#     try:
-#         # Fetch all students from the Student collection
-#         students = Student_collection.find({}, {"studentname": 1, "email": 1, "studentId": 1, "_id": 0})
-#
-#         # Prepare the response data
-#         students_list = []
-#         for student in students:
-#             students_list.append({
-#                 "name": student["studentname"],
-#                 "email": student["email"],
-#                 "studentId": student["studentId"]  # Include studentId
-#             })
-#
-#         return jsonify(students_list), 200
-#
-#     except Exception as e:
-#         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        # Prepare the response data
+        doctors_list = []
+        for doctor in doctors:
+            doctors_list.append({
+                "name": doctor["doctorname"],
+                "email": doctor["email"],
+                "doctorId": doctor["doctorId"]  # Include doctorId
+            })
+
+        return jsonify(doctors_list), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+
+@app.route('/get_all_students', methods=['GET'])
+def get_all_students():
+    try:
+        # Fetch all students from the Student collection
+        students = Student_collection.find({}, {"studentname": 1, "email": 1, "studentId": 1, "_id": 0})
+
+        # Prepare the response data
+        students_list = []
+        for student in students:
+            students_list.append({
+                "name": student["studentname"],
+                "email": student["email"],
+                "studentId": student["studentId"]  # Include studentId
+            })
+
+        return jsonify(students_list), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
 
