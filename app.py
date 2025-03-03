@@ -1178,18 +1178,13 @@ def get_counts():
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-@app.route('/update_doctor', methods=['PUT'])
-def update_doctor():
+@app.route('/update_doctor/<doctorId>', methods=['PUT'])
+def update_doctor(doctorId):
     try:
         # Get the updated doctor details from the request
         data = request.json
         if not data:
             return jsonify({"error": "No input data provided"}), 400
-
-        # Extract the doctor ID from the request
-        doctor_id = data.get("doctorId")
-        if not doctor_id:
-            return jsonify({"error": "Doctor ID is required"}), 400
 
         # Prepare the update data
         update_data = {}
@@ -1206,7 +1201,7 @@ def update_doctor():
 
         # Update the doctor details in the database
         result = Doctor_collection.update_one(
-            {"doctorId": doctor_id},
+            {"doctorId": doctorId},
             {"$set": update_data}
         )
 
@@ -1219,20 +1214,11 @@ def update_doctor():
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
-@app.route('/delete_doctor', methods=['DELETE'])
-def delete_doctor():
+@app.route('/delete_doctor/<doctorId>', methods=['DELETE'])
+def delete_doctor(doctorId):
     try:
-        # Get the doctor ID from the request
-        data = request.json
-        if not data:
-            return jsonify({"error": "No input data provided"}), 400
-
-        doctor_id = data.get("doctorId")
-        if not doctor_id:
-            return jsonify({"error": "Doctor ID is required"}), 400
-
         # Delete the doctor from the database
-        result = Doctor_collection.delete_one({"doctorId": doctor_id})
+        result = Doctor_collection.delete_one({"doctorId": doctorId})
 
         # Check if the doctor was found and deleted
         if result.deleted_count == 0:
@@ -1242,7 +1228,6 @@ def delete_doctor():
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
 
 
 
