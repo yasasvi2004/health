@@ -1089,5 +1089,95 @@ def approve_form(form_id):
     except Exception as e:
         print(f"Error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+# @app.route('/get_all_doctors', methods=['GET'])
+# def get_all_doctors():
+#     try:
+#         # Fetch all doctors from the Doctor collection
+#         doctors = Doctor_collection.find({}, {"doctorname": 1, "email": 1, "doctorId": 1, "_id": 0})
+#
+#         # Prepare the response data
+#         doctors_list = []
+#         for doctor in doctors:
+#             doctors_list.append({
+#                 "name": doctor["doctorname"],
+#                 "email": doctor["email"],
+#                 "doctorId": doctor["doctorId"]  # Include doctorId
+#             })
+#
+#         return jsonify(doctors_list), 200
+#
+#     except Exception as e:
+#         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+#
+#
+#
+# @app.route('/get_all_students', methods=['GET'])
+# def get_all_students():
+#     try:
+#         # Fetch all students from the Student collection
+#         students = Student_collection.find({}, {"studentname": 1, "email": 1, "studentId": 1, "_id": 0})
+#
+#         # Prepare the response data
+#         students_list = []
+#         for student in students:
+#             students_list.append({
+#                 "name": student["studentname"],
+#                 "email": student["email"],
+#                 "studentId": student["studentId"]  # Include studentId
+#             })
+#
+#         return jsonify(students_list), 200
+#
+#     except Exception as e:
+#         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+
+@app.route('/get_counts', methods=['GET'])
+def get_counts():
+    try:
+        # Count total forms submitted
+        total_forms = organs_collection.count_documents({})
+
+        # Count approved forms
+        approved_forms = organs_collection.count_documents({"status": "approved"})
+
+        # Count rejected forms
+        rejected_forms = organs_collection.count_documents({"status": "rejected"})
+
+        # Count pending forms
+        pending_forms = organs_collection.count_documents({"status": "pending"})
+
+        # Count available doctors
+        available_doctors = Doctor_collection.count_documents({})
+
+        # Count available students
+        available_students = Student_collection.count_documents({})
+
+        # Prepare the response data
+        counts = {
+            "total_forms": total_forms,
+            "approved_forms": approved_forms,
+            "rejected_forms": rejected_forms,
+            "pending_forms": pending_forms,
+            "available_doctors": available_doctors,
+            "available_students": available_students
+        }
+
+        return jsonify(counts), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
     app.run(debug=True)
