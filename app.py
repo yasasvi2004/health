@@ -1138,8 +1138,7 @@ def approve_form(form_id):
 @app.route('/get_counts', methods=['GET'])
 def get_counts():
     try:
-        # Count total forms submitted
-        total_forms = organs_collection.count_documents({})
+
 
         # Count approved forms
         approved_forms = organs_collection.count_documents({"status": "approved"})
@@ -1158,7 +1157,6 @@ def get_counts():
 
         # Prepare the response data
         counts = {
-            "total_forms": total_forms,
             "approved_forms": approved_forms,
             "rejected_forms": rejected_forms,
             "pending_forms": pending_forms,
