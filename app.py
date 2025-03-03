@@ -1071,10 +1071,9 @@ def approve_form(form_id):
             "approved_timestamp": datetime.now()  # Add approval timestamp
         }
 
-        # Update fields from inputFields if provided
+        # Update inputfields if provided
         if "inputfields" in data:
-            for field, value in data["inputfields"].items():
-                updated_form_data[field] = value
+            updated_form_data["inputfields"] = data["inputfields"]
 
         # Update conditions if provided
         if "conditions" in data:
