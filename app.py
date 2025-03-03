@@ -1178,6 +1178,72 @@ def get_counts():
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
+@app.route('/update_doctor', methods=['PUT'])
+def update_doctor():
+    try:
+        # Get the updated doctor details from the request
+        data = request.json
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
+
+        # Extract the doctor ID from the request
+        doctor_id = data.get("doctorId")
+        if not doctor_id:
+            return jsonify({"error": "Doctor ID is required"}), 400
+
+        # Prepare the update data
+        update_data = {}
+        if "doctorname" in data:
+            update_data["doctorname"] = data["doctorname"]
+        if "email" in data:
+            update_data["email"] = data["email"]
+        if "designation" in data:
+            update_data["designation"] = data["designation"]
+
+        # Check if there is any data to update
+        if not update_data:
+            return jsonify({"error": "No fields to update"}), 400
+
+        # Update the doctor details in the database
+        result = Doctor_collection.update_one(
+            {"doctorId": doctor_id},
+            {"$set": update_data}
+        )
+
+        # Check if the doctor was found and updated
+        if result.matched_count == 0:
+            return jsonify({"error": "Doctor not found"}), 404
+
+        return jsonify({"message": "Doctor details updated successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+@app.route('/delete_doctor', methods=['DELETE'])
+def delete_doctor():
+    try:
+        # Get the doctor ID from the request
+        data = request.json
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
+
+        doctor_id = data.get("doctorId")
+        if not doctor_id:
+            return jsonify({"error": "Doctor ID is required"}), 400
+
+        # Delete the doctor from the database
+        result = Doctor_collection.delete_one({"doctorId": doctor_id})
+
+        # Check if the doctor was found and deleted
+        if result.deleted_count == 0:
+            return jsonify({"error": "Doctor not found"}), 404
+
+        return jsonify({"message": "Doctor deleted successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
 
 
 
