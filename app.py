@@ -1102,7 +1102,7 @@ def approve_form(form_id):
 def get_all_doctors():
     try:
         # Fetch all doctors from the Doctor collection
-        doctors = Doctor_collection.find({}, {"doctorname": 1, "email": 1, "doctorId": 1, "_id": 0})
+        doctors = Doctor_collection.find({}, {"doctorname": 1, "email": 1, "doctorId": 1, "_id": 0, "designation": 1})
 
         # Prepare the response data
         doctors_list = []
@@ -1110,7 +1110,8 @@ def get_all_doctors():
             doctors_list.append({
                 "name": doctor["doctorname"],
                 "email": doctor["email"],
-                "doctorId": doctor["doctorId"]  # Include doctorId
+                "doctorId": doctor["doctorId"], # Include doctorId
+                "designation" : doctor['designation']
             })
 
         return jsonify(doctors_list), 200
