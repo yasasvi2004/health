@@ -45,16 +45,25 @@ Student_collection.create_index("studentId", unique=True)
 
 def generate_admin_credentials():
     """Generate admin username and password."""
+
+    adminName = "Admin"  # Example admin name
+    adminId = "ADMIN01"  # Example admin ID
+    email = "teja.g@makonissoft.com"  # Example admin email
     username = "admin@1"
     password = "admin123"  # Use the same password generation function
     hashed_password = generate_password_hash(password)
 
     # Store credentials in environment variables or a secure location
+    os.environ['ADMIN_NAME'] = adminName
+    os.environ['ADMIN_ID'] = adminId
+    os.environ['ADMIN_EMAIL'] = email
     os.environ['ADMIN_USERNAME'] = username
     os.environ['ADMIN_PASSWORD'] = hashed_password
 
     # For demonstration purposes, print the credentials
-    print(f"Admin credentials - Username: {username}, Password: {password}")
+
+
+    print(f"Admin credentials - Name: {adminName}, ID: {adminId}, Email: {email}, Username: {username}, Password: {password}")
 
 
 load_dotenv()
@@ -223,61 +232,6 @@ def register_doctor():
         return jsonify({"error": "An error occurred during registration."}), 500
 
 
-# @app.route('/register', methods=['POST'])
-# def register_doctor():
-#     try:
-#         data = request.json
-#         if not data:
-#             return jsonify({"error": "No input data provided"}), 400
-#
-#         # Validate input data
-#         doctorname = data.get('doctorname')
-#         email = data.get('email')
-#         mobile = data.get('mobile')
-#         designation = data.get('designation')
-#         placeOfWork = data.get('placeOfWork')
-#
-#         if not all([doctorname, email, mobile, designation, placeOfWork]):
-#             return jsonify({"error": "Missing required fields"}), 400
-#
-#         if Doctor_collection.find_one({"email": email}):
-#             return jsonify({"error": "Email already registered."}), 400
-#
-#         # Generate a unique doctor ID
-#         doctorId = generate_doctor_id()
-#         while Doctor_collection.find_one({"doctorId": doctorId}):
-#             doctorId = generate_doctor_id()  # Regenerate if not unique
-#
-#         # Generate a random password
-#         password = generate_password()
-#
-#         # Hash the password
-#         hashed_password = generate_password_hash(password)
-#
-#         # Create a new doctor document with timestamp
-#         doctor = {
-#             "doctorname": doctorname,
-#             "email": email,
-#             "mobile": mobile,
-#             "doctorId": doctorId,
-#             "designation": designation,
-#             "placeOfWork": placeOfWork,
-#             "usertype": "doctor",
-#             "password": hashed_password,
-#             "timestamp": datetime.now()  # Add current date and time
-#         }
-#
-#         # Send email with login details
-#         send_email(email, email, password)
-#
-#         # Insert the doctor into the collection
-#         Doctor_collection.insert_one(doctor)
-#
-#         return jsonify({"message": "Doctor registered successfully! Login details sent to email."}), 201
-#
-#     except Exception as e:
-#         return jsonify({"error": "An error occurred during registration."}), 500
-
 def generate_student_id():
     """Generate a unique student ID."""
     prefix = "STU"
@@ -354,69 +308,6 @@ def register_student():
     except Exception as e:
         return jsonify({"error": f"An error occurred during registration: {str(e)}"}), 500
 
-# @app.route('/register_student', methods=['POST'])
-# def register_student():
-#     try:
-#         data = request.json
-#         if not data:
-#             return jsonify({"error": "No input data provided"}), 400
-#
-#         # Validate input data
-#         studentname = data.get('studentname')
-#         email = data.get('email')
-#         phone = data.get('phone')
-#         college = data.get('college')
-#         degree = data.get('degree')
-#         doctorname = data.get('doctorname')
-#         doctorId = data.get('doctorId')
-#
-#         required_fields = [studentname, email, phone, college, degree, doctorname, doctorId]
-#         if not all(required_fields):
-#             return jsonify({"error": "Missing required fields"}), 400
-#
-#         # Check for existing email
-#         if Student_collection.find_one({"email": email}):
-#             return jsonify({"error": "Email already registered."}), 400
-#
-#         # Check if the doctor exists
-#         doctor = Doctor_collection.find_one({"doctorId": doctorId, "doctorname": doctorname})
-#         if not doctor:
-#             return jsonify({"error": "Doctor does not exist with the provided ID and name."}), 400
-#
-#         # Generate a unique student ID
-#         studentId = generate_student_id()
-#         while Student_collection.find_one({"studentId": studentId}):
-#             studentId = generate_student_id()  # Regenerate if not unique
-#
-#         # Generate a random password and hash it
-#         password = generate_password()
-#         hashed_password = generate_password_hash(password)
-#
-#         # Create a new student document with timestamp
-#         student = {
-#             "studentname": studentname,
-#             "email": email,
-#             "phone": phone,
-#             "studentId": studentId,
-#             "college": college,
-#             "degree": degree,
-#             "doctorname": doctorname,
-#             "doctorId": doctorId,
-#             "usertype": "student",
-#             "password": hashed_password,
-#             "timestamp": datetime.now()  # Add current date and time
-#         }
-#
-#         # Insert the student into the collection
-#         Student_collection.insert_one(student)
-#
-#         # Send email with login details
-#         send_student_email(email, email, password)
-#
-#         return jsonify({"message": "Student registered successfully! Login details sent to email."}), 201
-#
-#     except Exception as e:
-#         return jsonify({"error": f"An error occurred during registration: {str(e)}"}), 500
 def send_student_email(recipient, username, password):
     """Send an email with student login details."""
     sender_email = "vutukuridinesh18@gmail.com"
@@ -445,83 +336,6 @@ def send_student_email(recipient, username, password):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# @app.route('/login', methods=['POST'])
-# def login():
-#     try:
-#         data = request.json
-#         if not data:
-#             return jsonify({"error": "No input data provided"}), 400
-#
-#         email = data.get('email')
-#         password = data.get('password')
-#
-#         # Check if the user is an admin
-#         stored_username = os.environ.get('ADMIN_USERNAME')
-#         stored_password = os.environ.get('ADMIN_PASSWORD')
-#         if email == stored_username and check_password_hash(stored_password, password):
-#             return jsonify({
-#                 "message": "Login successful",
-#                 "user": {
-#                     "username": stored_username,
-#                     "usertype": "admin"
-#                 }
-#             }), 200
-#
-#         # Check if the user is a doctor
-#         doctor = Doctor_collection.find_one({"email": email})
-#         if doctor and check_password_hash(doctor['password'], password):
-#             return jsonify({
-#                 "message": "Login successful",
-#                 "user": {
-#                     "doctorName": doctor['doctorname'],
-#                     "email": doctor['email'],
-#                     "mobile": doctor['mobile'],
-#                     "doctorId": doctor['doctorId'],
-#                     "designation": doctor['designation'],
-#                     "placeOfWork": doctor['placeOfWork'],
-#                     "usertype": "doctor"
-#                 }
-#             }), 200
-#
-#         # Check if the user is a student
-#         student = Student_collection.find_one({"email": email})
-#         if student and check_password_hash(student['password'], password):
-#             return jsonify({
-#                 "message": "Login successful",
-#                 "user": {
-#                     "studentname": student['studentname'],
-#                     "email": student['email'],
-#                     "phone": student['phone'],
-#                     "studentId": student['studentId'],
-#                     "college": student['college'],
-#                     "degree": student['degree'],
-#                     "usertype": "student"
-#                 }
-#             }), 200
-#
-#         # If no match is found
-#         return jsonify({"error": "Invalid email or password"}), 401
-#
-#     except Exception as e:
-#         return jsonify({"error": f"An error occurred during login: {str(e)}"}), 500
-
 @app.route('/login', methods=['POST'])
 def login():
     try:
@@ -535,12 +349,18 @@ def login():
         # Check if the user is an admin
         stored_username = os.environ.get('ADMIN_USERNAME')
         stored_password = os.environ.get('ADMIN_PASSWORD')
+        stored_adminName=os.environ.get('ADMIN_NAME')
+        stored_adminId=os.environ.get('ADMIN_ID')
+        stored_email=os.environ.get('ADMIN_EMAIL')
         if username == stored_username and check_password_hash(stored_password, password):
             return jsonify({
                 "message": "Login successful",
                 "user": {
                     "username": stored_username,
-                    "usertype": "admin"
+                    "usertype": "admin",
+                    "adminName": stored_adminName,
+                    "adminId":stored_adminId,
+                    "email":stored_email
                 }
             }), 200
 
