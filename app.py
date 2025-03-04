@@ -978,6 +978,7 @@ def get_forms_by_doctor():
                 "studentId": student["studentId"],
                 "studentName": student["studentname"],
                 "doctorId": student["doctorId"],
+                "doctorName":student["doctorname"],
                 "formId": str(form["_id"]),  # Convert ObjectId to string
                 "timestamp": form.get("timestamp"),  # Include submission timestamp
                 "approved_timestamp": form.get("approved_timestamp"),  # Include approval timestamp
