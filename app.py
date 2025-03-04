@@ -1266,29 +1266,7 @@ def update_student(studentId):
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-@app.route('/delete_student/<studentId>', methods=['DELETE'])
-def delete_student(studentId):
-    try:
-        # Validate studentId
-        if not studentId or not isinstance(studentId, str):
-            return jsonify({"error": "Invalid student ID"}), 400
 
-        # Check if the student exists
-        student = Student_collection.find_one({"studentId": studentId})
-        if not student:
-            return jsonify({"error": "Student not found"}), 404
-
-        # Delete the student from the database
-        result = Student_collection.delete_one({"studentId": studentId})
-
-        # Check if the student was found and deleted
-        if result.deleted_count == 0:
-            return jsonify({"error": "Student not found"}), 404
-
-        return jsonify({"message": "Student deleted successfully"}), 200
-
-    except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
 
