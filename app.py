@@ -690,6 +690,11 @@ def submit_form(organ):
         if not student_id:
             return jsonify({"error": "Student ID is required"}), 400
 
+        # Check if the student has already submitted a form for this organ
+        existing_form = organs_collection.find_one({"studentId": student_id, "organ": organ})
+        if existing_form:
+            return jsonify({"error": f"Student has already submitted a form for {organ}"}), 400
+
         # Check database connection
         if Student_collection is None or organs_collection is None:
             return jsonify({"error": "Database connection failed"}), 500
