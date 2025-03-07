@@ -630,6 +630,13 @@ def add_condition(organ):
         if not student_id:
             return jsonify({"error": "Student ID is required"}), 400
 
+        # Check if the student has already submitted conditions for this organ
+        existing_conditions = organs_collection.find_one(
+            {"studentId": student_id, "organ": organ, "conditions": {"$exists": True}}
+        )
+        if existing_conditions:
+            return jsonify({"error": f"Student has already submitted conditions for {organ}"}), 400
+
         student = Student_collection.find_one({"studentId": student_id})
         if not student:
             return jsonify({"error": "Student not found"}), 404
@@ -647,12 +654,12 @@ def add_condition(organ):
                         "symptoms": condition.get('symptoms', ''),
                         "signs": condition.get('signs', ''),
                         "clinicalObservations": condition.get('clinicalObservations', ''),
-                        "bloodTests": condition.get('bloodTests',''),
-                        "urineTests": condition.get('urineTests',''),
-                        "heartRate": condition.get('heartRate',''),
-                        "bloodPressure": condition.get('bloodPressure',''),
-                        "xRays":condition.get('xRays','') ,
-                        "mriScans": condition.get('mriScans','')
+                        "bloodTests": condition.get('bloodTests', ''),
+                        "urineTests": condition.get('urineTests', ''),
+                        "heartRate": condition.get('heartRate', ''),
+                        "bloodPressure": condition.get('bloodPressure', ''),
+                        "xRays": condition.get('xRays', ''),
+                        "mriScans": condition.get('mriScans', '')
                     }
 
                     # Use part_key (e.g., addEpicardium) for storage
@@ -666,7 +673,6 @@ def add_condition(organ):
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
 
 
 def is_valid_base64(data):
