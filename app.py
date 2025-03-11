@@ -605,7 +605,14 @@ organs_structure = {
                     "ventralRoot", "vertebralColumn", "meninges", "cerebrospinalFluid",
                     "classification"
                 ]
-            }
+            },
+    "lung": {
+            "parts": [
+                "rightUpperLobe", "rightMiddleLobe", "rightLowerLobe", "leftUpperLobe",
+                "leftLowerLobe", "mainBronchi", "lobarBronchi", "segmentalBronchi",
+                "visceralPleura", "parietalPleura", "alveoli", "classification"
+            ]
+        }
     # Add more organs as needed
 }
 
