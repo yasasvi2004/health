@@ -619,7 +619,17 @@ organs_structure = {
                 "renalCorpuscle", "proximalConvolutedTubule", "loopOfHenle",
                 "distalConvolutedTubule", "collectingDuct", "bloodSupply", "additionalClassification"
             ]
+        },
+    "skin": {
+            "parts": [
+                "epidermis", "keratinocytes", "melanocytes", "langerhansCells", "merkelCells",
+                "hypodermis", "adiposeTissue", "bloodVesselsHypodermis", "dermis",
+                "collagenElastinFibers", "bloodVesselsDermis", "nerveEndings", "hairFollicles",
+                "sebaceousGlands", "functionsOfSkin", "protection", "regulation",
+                "sensation", "metabolism", "excretion", "additionalClassification"
+            ]
         }
+
 
     # Add more organs as needed
 }
