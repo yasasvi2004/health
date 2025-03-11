@@ -622,11 +622,12 @@ organs_structure = {
         },
     "skin": {
             "parts": [
-                "epidermis", "keratinocytes", "melanocytes", "langerhansCells", "merkelCells",
-                "hypodermis", "adiposeTissue", "bloodVesselsHypodermis", "dermis",
-                "collagenElastinFibers", "bloodVesselsDermis", "nerveEndings", "hairFollicles",
-                "sebaceousGlands", "functionsOfSkin", "protection", "regulation",
-                "sensation", "metabolism", "excretion", "additionalClassification"
+                    "keratinocytes", "melanocytes", "langerhansCells", "merkelCells",
+                    "adiposeTissue", "bloodVesselsHypodermis",
+                    "collagenElastinFibers", "bloodVesselsDermis", "nerveEndings",
+                    "hairFollicles", "sebaceousGlands",
+                    "protection", "regulation", "sensation", "metabolism",
+                    "excretion", "additionalClassification"
             ]
         }
 
