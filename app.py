@@ -612,7 +612,15 @@ organs_structure = {
                 "leftLowerLobe", "mainBronchi", "lobarBronchi", "segmentalBronchi",
                 "visceralPleura", "parietalPleura", "alveoli", "classification"
             ]
+        },
+    "kidney": {
+            "parts": [
+                "renalCapsule", "hilum", "renalCortex", "renalMedulla", "renalPelvis",
+                "renalCorpuscle", "proximalConvolutedTubule", "loopOfHenle",
+                "distalConvolutedTubule", "collectingDuct", "bloodSupply", "additionalClassification"
+            ]
         }
+
     # Add more organs as needed
 }
 
