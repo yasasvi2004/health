@@ -730,13 +730,36 @@ def get_clinical_conditions_by_organ(organ):
         forms = organs_collection.find({"organ": organ})
 
         # Prepare the response data
-        clinical_conditions = {}
+        clinical_conditions = []
         for form in forms:
-            if "conditions" in form:
+            if "conditions" in form and form["conditions"]:  # Check if conditions exist and are not empty
+                # Fetch student details
+                student = Student_collection.find_one({"studentId": form["studentId"]})
+                if not student:
+                    continue  # Skip if student not found
+
+                # Iterate through each part and its conditions
                 for part, conditions in form["conditions"].items():
-                    if part not in clinical_conditions:
-                        clinical_conditions[part] = []
-                    clinical_conditions[part].extend(conditions)
+                    # Remove null fields and empty conditions
+                    cleaned_conditions = []
+                    for condition in conditions:
+                        if condition:  # Check if the condition is not empty
+                            cleaned_condition = {k: v for k, v in condition.items() if v is not None}
+                            if cleaned_condition:  # Ensure the cleaned condition is not empty
+                                cleaned_condition["subpart"] = part  # Add subpart name inside the condition
+                                cleaned_conditions.append(cleaned_condition)
+
+                    # Only include parts with non-empty conditions
+                    if cleaned_conditions:
+                        clinical_conditions.append({
+                            "studentId": student["studentId"],
+                            "studentName": student["studentname"],
+                            "part": part,
+                            "noOfConditions": len(cleaned_conditions),
+                            "conditions": {
+                                f"record{i+1}": condition for i, condition in enumerate(cleaned_conditions)
+                            }
+                        })
 
         return jsonify(clinical_conditions), 200
 
