@@ -630,7 +630,25 @@ organs_structure = {
         "excretion", "additionalClassification"
 
             ]
-        }
+        },
+    "ear": {
+        "parts": [
+            "pinna","externalAuditoryCanal","eardrum","ossicles","eustachianTube","cochlea","vestibularSystem","additionalClassification"
+        ]
+    },
+    "eye": {
+        "parts":[
+            "cornea","iris","pupil","lens","retina","opticNerve","vitreousHumor","sclera","choroid","additionalClassification"
+        ]
+    },
+    "gastrointestinal": {
+        "parts": [
+            "oralCavity", "esophagus", "stomach", "duodenum",
+            "Jejunum", "Ileum", "cecum", "colon", "rectum",
+            "liver", "gallbladder", "pancreas", "additionalClassification"
+        ]
+    }
+
 
 
     # Add more organs as needed
