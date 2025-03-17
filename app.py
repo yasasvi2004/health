@@ -719,6 +719,30 @@ def add_condition(organ):
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
+@app.route('/get_clinical_conditions_by_organ/<organ>', methods=['GET'])
+def get_clinical_conditions_by_organ(organ):
+    try:
+        # Validate organ name
+        if not validate_organ(organ):
+            return jsonify({"error": f"Invalid organ: {organ}"}), 400
+
+        # Fetch all forms for the specified organ
+        forms = organs_collection.find({"organ": organ})
+
+        # Prepare the response data
+        clinical_conditions = {}
+        for form in forms:
+            if "conditions" in form:
+                for part, conditions in form["conditions"].items():
+                    if part not in clinical_conditions:
+                        clinical_conditions[part] = []
+                    clinical_conditions[part].extend(conditions)
+
+        return jsonify(clinical_conditions), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
 
 def is_valid_base64(data):
     try:
