@@ -647,7 +647,15 @@ organs_structure = {
             "Jejunum", "Ileum", "cecum", "colon", "rectum",
             "liver", "gallbladder", "pancreas", "additionalClassification"
         ]
+    },
+    "reproductiveorganfemale": {
+        "parts": [
+            "ovaries", "fallopianTubes", "uterus", "vagina",
+            "labiaMajora", "labiaMinora", "clitoris", "vaginalOpening",
+            "hormonalRegulation", "additionalClassification"
+        ]
     }
+
 
 
 
