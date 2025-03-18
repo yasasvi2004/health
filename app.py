@@ -654,7 +654,15 @@ organs_structure = {
             "labiaMajora", "labiaMinora", "clitoris", "vaginalOpening",
             "hormonalRegulation", "additionalClassification"
         ]
+    },
+    "reproductiveorganmale": {
+        "parts": [
+            "testes", "epididymis", "vasDeferens", "seminalVesicles",
+            "prostateGland", "bulbourethralGlands", "urethra",
+            "penis", "additionalClassification"
+        ]
     }
+
 
 
 
