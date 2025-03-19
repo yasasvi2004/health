@@ -661,7 +661,15 @@ organs_structure = {
             "prostateGland", "bulbourethralGlands", "urethra",
             "penis", "additionalClassification"
         ]
+    },
+    "hematopoietic": {
+        "parts": [
+            "hematopoieticStemCells", "progenitorCells", "boneMarrow", "peripheralBlood",
+            "spleen", "lymphNode", "myeloidLineage", "lymphoidLineage",
+            "anemia", "leukemia", "thrombocytopenia", "additionalClassification"
+        ]
     }
+
 
 
 
