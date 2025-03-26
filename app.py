@@ -700,11 +700,11 @@ def add_condition(organ):
             return jsonify({"error": "Student ID is required"}), 400
 
         # Check if the student has already submitted conditions for this organ
-        existing_conditions = organs_collection.find_one(
-            {"studentId": student_id, "organ": organ, "conditions": {"$exists": True}}
+        existing_form = organs_collection.find_one(
+            {"studentId": student_id, "organ": organ}
         )
-        if existing_conditions:
-            return jsonify({"error": f"Student has already submitted the form for {organ}"}), 400
+        if existing_form:
+            return jsonify({"error": f"Student has already submitted a form for {organ}"}), 400
 
         student = Student_collection.find_one({"studentId": student_id})
         if not student:
