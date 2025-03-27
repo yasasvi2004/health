@@ -909,37 +909,31 @@ def count_forms_by_doctor():
 @app.route('/get_unapproved_forms', methods=['GET'])
 def get_forms_by_doctor():
     try:
-        # Fetch all forms with status "pending", "approved", or "rejected"
-        forms = organs_collection.find({"status": {"$in": ["pending", "approved", "rejected"]}})
-
-        # Prepare the response data
+        forms = list(organs_collection.find({"status": {"$in": ["pending", "approved", "rejected"]}}))
+        student_ids = {form["studentId"] for form in forms}
+        students = {s["studentId"]: s for s in Student_collection.find({"studentId": {"$in": list(student_ids)}})}
         response_data = []
         for form in forms:
-            # Fetch student details
-            student = Student_collection.find_one({"studentId": form["studentId"]})
+            student = students.get(form["studentId"])
             if not student:
-                continue  # Skip if student not found
-
-            # Prepare the card data
+                continue 
             card_data = {
                 "studentId": student["studentId"],
                 "studentName": student["studentname"],
                 "doctorId": student["doctorId"],
-                "doctorName":student["doctorname"],
-                "formId": str(form["_id"]),  # Convert ObjectId to string
-                "timestamp": form.get("timestamp"),  # Include submission timestamp
-                "approved_timestamp": form.get("approved_timestamp"),  # Include approval timestamp
-                "rejected_timestamp": form.get("rejected_timestamp"),  # Include rejection timestamp
-                "status": form.get("status"),  # Include form status
-                "organ": form.get("organ")  # Include organ type
+                "doctorName": student["doctorname"],
+                "formId": str(form["_id"]),
+                "timestamp": form.get("timestamp"),
+                "approved_timestamp": form.get("approved_timestamp"),
+                "rejected_timestamp": form.get("rejected_timestamp"),
+                "status": form.get("status"),
+                "organ": form.get("organ")
             }
             response_data.append(card_data)
-
         return jsonify(response_data), 200
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
 @app.route('/fetch_form_details/<form_id>', methods=['GET'])
 def fetch_form_details(form_id):
     try:

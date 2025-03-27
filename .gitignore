@@ -1,0 +1,34 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+*.venv
+health/
+# Environment variables
+.env
+*.env
+
+# Logs and databases
+logs/
+*.log
+*.sqlite3
+*.db
+
+# Flask cache
+instance/
+.cache/
+*.pid
+
+# VS Code and PyCharm settings
+.vscode/
+.idea/
+*.iml
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+#
