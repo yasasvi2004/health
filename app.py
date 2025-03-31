@@ -906,17 +906,28 @@ def count_forms_by_doctor():
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
-@app.route('/get_unapproved_forms', methods=['GET'])
-def get_forms_by_doctor():
+@app.route('/get_unapproved_forms/<organ>', methods=['GET'])
+def get_forms_by_doctor(organ):
     try:
-        forms = list(organs_collection.find({"status": {"$in": ["pending", "approved", "rejected"]}}))
+        # Find forms based on both status and the specified organ name
+        forms = list(organs_collection.find({
+            "status": {"$in": ["pending", "approved", "rejected"]},
+            "organ": organ  # Filter by organ
+        }))
+
+        # Gather all student IDs from the forms
         student_ids = {form["studentId"] for form in forms}
+
+        # Retrieve students based on the collected student IDs
         students = {s["studentId"]: s for s in Student_collection.find({"studentId": {"$in": list(student_ids)}})}
+
         response_data = []
+
         for form in forms:
             student = students.get(form["studentId"])
             if not student:
-                continue 
+                continue
+                # Create card data for the response
             card_data = {
                 "studentId": student["studentId"],
                 "studentName": student["studentname"],
