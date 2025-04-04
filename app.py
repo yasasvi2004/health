@@ -668,7 +668,15 @@ organs_structure = {
             "spleen", "lymphNode", "myeloidLineage", "lymphoidLineage",
             "anemia", "leukemia", "thrombocytopenia", "additionalClassification"
         ]
+    },
+    "thyroid": {
+        "parts": [
+            "rightLobe", "leftLobe", "isthmus", "arterialSupply",
+            "venousDrainage", "capsule", "innervation", "histology",
+            "parathyroidGlands", "trachea", "additionalClassifications"
+        ]
     }
+
 
 
 
@@ -1015,6 +1023,7 @@ def approve_form(form_id):
         # Fetch the existing form from the database
         existing_form = organs_collection.find_one({"_id": form_object_id})
         print(f"Existing Form: {existing_form}")
+        
         if not existing_form:
             return jsonify({"error": "Form not found"}), 404
 
