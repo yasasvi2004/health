@@ -683,21 +683,13 @@ organs_structure = {
             "additionalClassification"
         ]
     },
-    "adrenalGlands": {
+    "adrenalglands": {
         "parts": [
             "zonaGlomerulosa", "zonaFasciculata", "zonaReticularis",
             "superiorSuprarenalArteries", "middleSuprarenalArtery", "inferiorSuprarenalArteries",
             "adrenalMedulla", "additionalClassification"
         ]
     }
-
-
-
-
-
-
-
-
     # Add more organs as needed
 }
 
