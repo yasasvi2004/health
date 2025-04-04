@@ -675,7 +675,15 @@ organs_structure = {
             "venousDrainage", "capsule", "innervation", "histology",
             "parathyroidGlands", "trachea", "additionalClassifications"
         ]
+    },
+    "pancreas": {
+        "parts": [
+            "exocrineTissue", "endocrineTissue",
+            "digestiveFunction", "endocrineFunction",
+            "additionalClassification"
+        ]
     }
+
 
 
 
