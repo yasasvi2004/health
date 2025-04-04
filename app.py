@@ -645,7 +645,7 @@ organs_structure = {
         "parts": [
             "oralCavity", "esophagus", "stomach", "duodenum",
             "Jejunum", "Ileum", "cecum", "colon", "rectum",
-            "liver", "gallbladder", "pancreas", "additionalClassification"
+            "liver", "gallbladder", "additionalClassification"
         ]
     },
     "reproductiveorganfemale": {
