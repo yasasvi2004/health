@@ -682,6 +682,13 @@ organs_structure = {
             "digestiveFunction", "endocrineFunction",
             "additionalClassification"
         ]
+    },
+    "adrenalGlands": {
+        "parts": [
+            "zonaGlomerulosa", "zonaFasciculata", "zonaReticularis",
+            "superiorSuprarenalArteries", "middleSuprarenalArtery", "inferiorSuprarenalArteries",
+            "adrenalMedulla", "additionalClassification"
+        ]
     }
 
 
