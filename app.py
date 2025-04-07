@@ -253,26 +253,48 @@ def register_student():
         phone = data.get('phone')
         college = data.get('college')
         degree = data.get('degree')
-        doctorname = data.get('doctorname')
-        doctorId = data.get('doctorId')
+        organs = data.get('organs', [])  # Optional field, default to empty list
 
-        required_fields = [studentname, email, phone, college, degree, doctorname, doctorId]
+        # Check if registration is by admin or doctor
+        is_admin_registration = 'adminName' in data and 'adminId' in data
+        is_doctor_registration = 'doctorname' in data and 'doctorId' in data
+
+        if not (is_admin_registration or is_doctor_registration):
+            return jsonify({"error": "Missing registration authority (admin or doctor) details"}), 400
+
+        required_fields = [studentname, email, phone, college, degree]
         if not all(required_fields):
-            return jsonify({"error": "Missing required fields"}), 400
+            return jsonify({"error": "Missing required student fields"}), 400
 
         # Check for existing email
         if Student_collection.find_one({"email": email}):
             return jsonify({"error": "Email already registered."}), 400
 
-        # Check if the doctor exists
-        doctor = Doctor_collection.find_one({"doctorId": doctorId, "doctorname": doctorname})
-        if not doctor:
-            return jsonify({"error": "Doctor does not exist with the provided ID and name."}), 400
+        # If registration by doctor, verify doctor exists
+        if is_doctor_registration:
+            doctor = Doctor_collection.find_one({
+                "doctorId": data['doctorId'],
+                "doctorname": data['doctorname']
+            })
+            if not doctor:
+                return jsonify({"error": "Doctor does not exist with the provided ID and name."}), 400
+            registration_authority = {
+                "doctorname": data['doctorname'],
+                "doctorId": data['doctorId']
+            }
+        else:  # Admin registration
+            # Verify admin credentials (optional additional security check)
+            if data['adminId'] != os.getenv('ADMIN_ID') or data['adminName'] != os.getenv('ADMIN_NAME'):
+                return jsonify({"error": "Invalid admin credentials"}), 403
+            registration_authority = {
+                "doctorname": data['adminName'],  # Stored as doctorname for consistency
+                "doctorId": data['adminId']       # Stored as doctorId for consistency
+            }
 
         # Generate a unique student ID
         studentId = generate_student_id()
         while Student_collection.find_one({"studentId": studentId}):
-            studentId = generate_student_id()  # Regenerate if not unique
+            studentId = generate_student_id()
 
         # Generate a random password and hash it
         password = generate_password()
@@ -289,21 +311,25 @@ def register_student():
             "studentId": studentId,
             "college": college,
             "degree": degree,
-            "doctorname": doctorname,
-            "doctorId": doctorId,
+            "doctorname": registration_authority["doctorname"],
+            "doctorId": registration_authority["doctorId"],
             "usertype": "student",
-            "username": username,  # Add username
+            "username": username,
             "password": hashed_password,
-            "timestamp": datetime.now()  # Add current date and time
+            "timestamp": datetime.now(),
+            "organs": organs  # Store the list of organs
         }
 
         # Insert the student into the collection
         Student_collection.insert_one(student)
 
         # Send email with login details
-        send_student_email(email, username, password)  # Include username in the email
+        send_student_email(email, username, password)
 
-        return jsonify({"message": "Student registered successfully! Login details sent to email."}), 201
+        return jsonify({
+            "message": "Student registered successfully! Login details sent to email.",
+            "studentId": studentId
+        }), 201
 
     except Exception as e:
         return jsonify({"error": f"An error occurred during registration: {str(e)}"}), 500
@@ -574,6 +600,7 @@ def reset_password_with_otp():
         return jsonify({"message": "Password reset successfully for student."}), 200
 
     return jsonify({"error": "Invalid email or OTP"}), 400
+
 
 
 
