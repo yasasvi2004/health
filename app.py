@@ -409,6 +409,7 @@ def login():
         # Check if the user is a student
         student = Student_collection.find_one({"username": username})
         if student and check_password_hash(student['password'], password):
+            student_organs = student.get('organs', [])
             return jsonify({
                 "message": "Login successful",
                 "user": {
@@ -418,7 +419,8 @@ def login():
                     "studentId": student['studentId'],
                     "college": student['college'],
                     "degree": student['degree'],
-                    "usertype": "student"
+                    "usertype": "student",
+                    "organs": student_organs
                 }
             }), 200
 
