@@ -183,10 +183,10 @@ def register_doctor():
         doctorname = data.get('doctorname')
         email = data.get('email')
         mobile = data.get('mobile')
-        designation = data.get('designation')
+        specialization = data.get('specialization')
         placeOfWork = data.get('placeOfWork')
 
-        if not all([doctorname, email, mobile, designation, placeOfWork]):
+        if not all([doctorname, email, mobile, specialization, placeOfWork]):
             return jsonify({"error": "Missing required fields"}), 400
 
         if Doctor_collection.find_one({"email": email}):
@@ -212,7 +212,7 @@ def register_doctor():
             "email": email,
             "mobile": mobile,
             "doctorId": doctorId,
-            "designation": designation,
+            "specialization": specialization,
             "placeOfWork": placeOfWork,
             "usertype": "doctor",
             "username": username,  # Add username
