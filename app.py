@@ -989,6 +989,46 @@ def get_forms_by_doctor(organ):
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+@app.route('/get_all_pending_forms', methods=['GET'])
+def get_all_pending_forms():
+    try:
+        # Find all forms with status "pending"
+        forms = list(organs_collection.find({
+            "status": "pending"
+        }))
+
+        # Gather all student IDs from the forms
+        student_ids = {form["studentId"] for form in forms}
+
+        # Retrieve students based on the collected student IDs
+        students = {s["studentId"]: s for s in Student_collection.find({"studentId": {"$in": list(student_ids)}})}
+
+        response_data = []
+
+        for form in forms:
+            student = students.get(form["studentId"])
+            if not student:
+                continue
+
+            # Create card data for the response
+            card_data = {
+                "studentId": student["studentId"],
+                "studentName": student["studentname"],
+                "doctorId": student["doctorId"],
+                "doctorName": student["doctorname"],
+                "formId": str(form["_id"]),
+                "timestamp": form.get("timestamp"),
+                "status": form.get("status"),
+                "organ": form.get("organ")
+            }
+            response_data.append(card_data)
+
+        return jsonify(response_data), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 @app.route('/fetch_form_details/<form_id>', methods=['GET'])
 def fetch_form_details(form_id):
     try:
