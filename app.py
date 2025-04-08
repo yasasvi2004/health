@@ -996,7 +996,7 @@ def get_all_pending_forms():
     try:
         # Find all forms with status "pending"
         forms = list(organs_collection.find({
-            "status": "pending"
+            "status": {"$in": ["pending","approved","rejected"]}
         }))
 
         # Gather all student IDs from the forms
