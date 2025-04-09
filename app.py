@@ -1022,8 +1022,8 @@ def get_all_pending_forms():
                 "timestamp": form.get("timestamp"),
                 "status": form.get("status"),
                 "organ": form.get("organ"),
-                "approved_timestamp": form.get("approved_timestamp"),
-                "rejected_timestamp": form.get("rejected_timestamp")
+                "approved_timestamp": form.get("approved_timestamp", None),
+                "rejected_timestamp": form.get("rejected_timestamp", None)
             }
             response_data.append(card_data)
 
