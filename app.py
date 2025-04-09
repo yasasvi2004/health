@@ -369,22 +369,20 @@ def login():
         password = data.get('password')
 
         # Check if the user is an admin
-        stored_username = os.environ.get('ADMIN_USERNAME')
-        stored_password = os.environ.get('ADMIN_PASSWORD')
-        stored_adminName=os.environ.get('ADMIN_NAME')
-        stored_adminId=os.environ.get('ADMIN_ID')
-        stored_email=os.environ.get('ADMIN_EMAIL')
-        if username == stored_username and check_password_hash(stored_password, password):
-            return jsonify({
-                "message": "Login successful",
-                "user": {
-                    "username": stored_username,
-                    "usertype": "admin",
-                    "adminName": stored_adminName,
-                    "adminId":stored_adminId,
-                    "email":stored_email
-                }
-            }), 200
+        if username == ADMIN_USERNAME:
+            if check_password_hash(ADMIN_HASHED_PASSWORD, password):
+                return jsonify({
+                    "message": "Admin login successful",
+                    "user": {
+                        "username": ADMIN_USERNAME,
+                        "usertype": "admin",
+                        "adminName": ADMIN_NAME,
+                        "adminId": ADMIN_ID,
+                        "email": ADMIN_EMAIL
+                    }
+                }), 200
+            else:
+                return jsonify({"error": "Invalid admin password"}), 401
 
         # Check if the user is a doctor
         doctor = Doctor_collection.find_one({"username": username})
