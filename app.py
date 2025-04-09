@@ -1,8 +1,6 @@
 from flask import Flask,jsonify,request
 from werkzeug.security import generate_password_hash,check_password_hash
-from pymongo import MongoClient, errors
-from pymongo.errors import DuplicateKeyError
-from werkzeug.exceptions import BadRequest
+from pymongo import MongoClient
 import smtplib
 import string
 import secrets
@@ -13,10 +11,10 @@ from bson.objectid import ObjectId
 from datetime import datetime
 import base64
 import boto3
-from botocore.exceptions import NoCredentialsError
 import uuid
 from dotenv import load_dotenv
 
+load_dotenv()
 
 
 
@@ -24,14 +22,17 @@ from dotenv import load_dotenv
 
 
 app = Flask(__name__)
-uri = "mongodb+srv://pandukrishna04:Raina%40143@cluster0.4fkpx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+uri = os.getenv('MONGODB_URI')
 client = MongoClient(uri)
-db=client.get_database('Health')
+db= client.get_database(os.getenv('MONGODB_DBNAME'))
 Doctor_collection=db['Doctor']
 Student_collection = db['Student']
 organs_collection = db['Organs']
 
 CORS(app)
+
+EMAIL_USER = os.getenv('EMAIL_USER')
+EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')
 
 
 Doctor_collection.create_index("email", unique=True)
@@ -43,30 +44,25 @@ Student_collection.create_index("studentId", unique=True)
 
 
 
-def generate_admin_credentials():
-    """Generate admin username and password."""
+# Admin Configuration
+ADMIN_NAME = os.getenv('ADMIN_NAME')
+ADMIN_ID = os.getenv('ADMIN_ID')
+ADMIN_EMAIL = os.getenv('ADMIN_EMAIL')
+ADMIN_USERNAME = os.getenv('ADMIN_USERNAME')
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD')
 
-    adminName = "Admin"  # Example admin name
-    adminId = "ADMIN01"  # Example admin ID
-    email = "teja.g@makonissoft.com"  # Example admin email
-    username = "admin@1"
-    password = "admin123"  # Use the same password generation function
-    hashed_password = generate_password_hash(password)
+# Verify all admin credentials are set
+if not all([ADMIN_NAME, ADMIN_ID, ADMIN_EMAIL, ADMIN_USERNAME, ADMIN_PASSWORD]):
+    raise ValueError("Missing one or more admin credentials in environment variables")
 
-    # Store credentials in environment variables or a secure location
-    os.environ['ADMIN_NAME'] = adminName
-    os.environ['ADMIN_ID'] = adminId
-    os.environ['ADMIN_EMAIL'] = email
-    os.environ['ADMIN_USERNAME'] = username
-    os.environ['ADMIN_PASSWORD'] = hashed_password
+# Hash the password once at startup
+ADMIN_HASHED_PASSWORD = generate_password_hash(ADMIN_PASSWORD)
 
-    # For demonstration purposes, print the credentials
+# Optionally print (remove in production)
+print(f"Admin credentials loaded - Name: {ADMIN_NAME}, ID: {ADMIN_ID}")
 
 
-    print(f"Admin credentials - Name: {adminName}, ID: {adminId}, Email: {email}, Username: {username}, Password: {password}")
 
-
-load_dotenv()
 # Initialize the S3 client
 s3= boto3.client('s3', aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
     aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
@@ -118,7 +114,7 @@ def upload_base64_to_s3(base64_data, file_name):
         print(f"Bucket: {bucket_name}, Key: {s3_key}")
         return None
 
-generate_admin_credentials()
+
 
 
 def generate_password(length=12):
@@ -141,8 +137,8 @@ def generate_username(usertype):
 
 def send_email(recipient, username, password):
 
-    sender_email = "vutukuridinesh18@gmail.com"
-    sender_password = "krvz zgas bqsu ymuh"
+    sender_email = EMAIL_USER
+    sender_password = EMAIL_PASSWORD
     message = f"""Subject: Your Login Details
 
     Dear Doctor,
@@ -336,8 +332,8 @@ def register_student():
 
 def send_student_email(recipient, username, password):
     """Send an email with student login details."""
-    sender_email = "vutukuridinesh18@gmail.com"
-    sender_password = "krvz zgas bqsu ymuh"
+    sender_email = EMAIL_USER
+    sender_password = EMAIL_PASSWORD
     smtp_server = "smtp.gmail.com"
     smtp_port = 587
 
@@ -435,8 +431,8 @@ def login():
 
 def send_reset_email(recipient, usertype):
     """Send an email notifying the user of a successful password reset."""
-    sender_email = "vutukuridinesh18@gmail.com"
-    sender_password = "krvz zgas bqsu ymuh"
+    sender_email = EMAIL_USER
+    sender_password = EMAIL_PASSWORD
     smtp_server = "smtp.gmail.com"
     smtp_port = 587
 
@@ -542,8 +538,8 @@ def forgot_password():
 
     # Send OTP via email using smtplib
     try:
-        sender_email = "vutukuridinesh18@gmail.com"
-        sender_password = "krvz zgas bqsu ymuh"
+        sender_email = EMAIL_USER
+        sender_password = EMAIL_PASSWORD
         smtp_server = "smtp.gmail.com"
         smtp_port = 587
 
