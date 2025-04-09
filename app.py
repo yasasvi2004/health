@@ -372,7 +372,7 @@ def login():
         if username == ADMIN_USERNAME:
             if check_password_hash(ADMIN_HASHED_PASSWORD, password):
                 return jsonify({
-                    "message": "Admin login successful",
+                    "message": "Login successful",
                     "user": {
                         "username": ADMIN_USERNAME,
                         "usertype": "admin",
