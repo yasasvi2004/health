@@ -1136,7 +1136,7 @@ def approve_form(form_id):
 def get_all_doctors():
     try:
         # Fetch all doctors from the Doctor collection
-        doctors = Doctor_collection.find({}, {"doctorname": 1, "email": 1, "doctorId": 1, "_id": 0, "designation": 1})
+        doctors = Doctor_collection.find({}, {"doctorname": 1, "email": 1, "doctorId": 1, "_id": 0, "specialization": 1})
 
         # Prepare the response data
         doctors_list = []
@@ -1145,7 +1145,7 @@ def get_all_doctors():
                 "name": doctor["doctorname"],
                 "email": doctor["email"],
                 "doctorId": doctor["doctorId"], # Include doctorId
-                "designation" : doctor['designation']
+                "specialization" : doctor['specialization']
             })
 
         return jsonify(doctors_list), 200
@@ -1226,8 +1226,8 @@ def update_doctor(doctorId):
             update_data["doctorname"] = data["doctorname"]
         if "email" in data:
             update_data["email"] = data["email"]
-        if "designation" in data:
-            update_data["designation"] = data["designation"]
+        if "specialization" in data:
+            update_data["specialization"] = data["specialization"]
 
         # Check if there is any data to update
         if not update_data:
