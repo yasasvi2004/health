@@ -394,7 +394,7 @@ def login():
                     "email": doctor['email'],
                     "mobile": doctor['mobile'],
                     "doctorId": doctor['doctorId'],
-                    "designation": doctor['designation'],
+                    "specialization": doctor['specialization'],
                     "placeOfWork": doctor['placeOfWork'],
                     "usertype": "doctor"
                 }
