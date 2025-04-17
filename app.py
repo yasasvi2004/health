@@ -708,67 +708,10 @@ def validate_organ(organ):
     return True
 
 
-@app.route('/add_condition/<organ>', methods=['POST'])
-def add_condition(organ):
-    try:
-        # Validate organ name
-        if not validate_organ(organ):
-            return jsonify({"error": f"Invalid organ: {organ}"}), 400
-
-        data = request.json
-        if not data:
-            return jsonify({"error": "No input data provided"}), 400
-
-        student_id = data.get('studentId')
-        if not student_id:
-            return jsonify({"error": "Student ID is required"}), 400
-
-        # Check if the student has already submitted conditions for this organ
-        existing_form = organs_collection.find_one(
-            {"studentId": student_id, "organ": organ}
-        )
-        if existing_form:
-            return jsonify({"error": f"Student has already submitted a form for {organ}"}), 400
-
-        student = Student_collection.find_one({"studentId": student_id})
-        if not student:
-            return jsonify({"error": "Student not found"}), 404
-
-        if student_id not in temporary_conditions:
-            temporary_conditions[student_id] = {}
-
-        organ_parts = organs_structure.get(organ, {}).get("parts", [])
-        for part in organ_parts:
-            part_key = f"add{part[0].upper()}{part[1:]}"  # This creates addEpicardium, etc.
-            if part_key in data:
-                for condition in data[part_key]:
-                    condition_entry = {
-                        "clinicalCondition": condition.get('clinicalCondition', ''),
-                        "symptoms": condition.get('symptoms', ''),
-                        "signs": condition.get('signs', ''),
-                        "clinicalObservations": condition.get('clinicalObservations', ''),
-                        "bloodTests": condition.get('bloodTests', ''),
-                        "urineTests": condition.get('urineTests', ''),
-                        "heartRate": condition.get('heartRate', ''),
-                        "bloodPressure": condition.get('bloodPressure', ''),
-                        "xRays": condition.get('xRays', ''),
-                        "mriScans": condition.get('mriScans', '')
-                    }
-
-                    # Use part_key (e.g., addEpicardium) for storage
-                    if part_key not in temporary_conditions[student_id]:
-                        temporary_conditions[student_id][part_key] = []
-
-                    temporary_conditions[student_id][part_key].append(condition_entry)
-
-        print(f"Temporary conditions after adding for {student_id}: {temporary_conditions}")  # Debug log
-        return jsonify({"message": f"Conditions added successfully for {organ}"}), 201
-
-    except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-@app.route('/get_clinical_conditions_by_organ/<organ>', methods=['GET'])
+
+@app.route('/get_clinical_conditions/<organ>', methods=['GET'])
 def get_clinical_conditions_by_organ(organ):
     try:
         # Validate organ name
@@ -824,7 +767,7 @@ def is_valid_base64(data):
         return False
 
 
-@app.route('/submit_part/<organ>/<part>', methods=['POST'])
+@app.route('/submit_form/<organ>/<part>', methods=['POST'])
 def submit_part(organ, part):
     try:
         # Validate organ name
@@ -918,6 +861,60 @@ def count_forms_by_doctor():
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
+@app.route('/add_condition/<organ>/<part>', methods=['POST'])
+def add_condition_to_part(organ, part):
+    try:
+        # Validate organ and part
+        if not validate_organ(organ):
+            return jsonify({"error": f"Invalid organ: {organ}"}), 400
+
+        organ_parts = organs_structure.get(organ, {}).get("parts", [])
+        if part not in organ_parts:
+            return jsonify({"error": f"Invalid part: {part}"}), 400
+
+        # Process input data
+        data = request.json
+        student_id = data.get('studentId')
+        if not student_id:
+            return jsonify({"error": "Student ID is required"}), 400
+
+        # Ensure student exists
+        student = Student_collection.find_one({"studentId": student_id})
+        if not student:
+            return jsonify({"error": "Student not found"}), 404
+
+        condition_entry = {
+            "clinicalCondition": data.get('clinicalCondition', ''),
+            "symptoms": data.get('symptoms', ''),
+            "signs": data.get('signs', ''),
+            "clinicalObservations": data.get('clinicalObservations', ''),
+            "bloodTests": data.get('bloodTests', ''),
+            "urineTests": data.get('urineTests', ''),
+            "heartRate": data.get('heartRate', ''),
+            "bloodPressure": data.get('bloodPressure', ''),
+            "xRays": data.get('xRays', ''),
+            "mriScans": data.get('mriScans', '')
+        }
+
+        # Update organ entry with conditions
+        organ_data = organs_collection.find_one({"studentId": student_id, "organ": organ})
+        if organ_data:
+            if "conditions" not in organ_data:
+                organ_data["conditions"] = {}
+
+            if part not in organ_data["conditions"]:
+                organ_data["conditions"][part] = []
+
+            organ_data["conditions"][part].append(condition_entry)
+
+            # Update the document
+            organs_collection.update_one({"_id": organ_data["_id"]}, {"$set": {"conditions": organ_data["conditions"]}})
+            return jsonify({"message": f"Conditions added successfully to {part} of {organ}"}), 201
+
+        return jsonify({"error": "Organ data not found"}), 404
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 @app.route('/get_unapproved_forms/<organ>', methods=['GET'])
 def get_forms_by_doctor(organ):
