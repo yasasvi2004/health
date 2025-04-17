@@ -1,5 +1,5 @@
-from flask import Flask,jsonify,request
-from werkzeug.security import generate_password_hash,check_password_hash
+from flask import Flask, jsonify, request
+from werkzeug.security import generate_password_hash, check_password_hash
 from pymongo import MongoClient
 import smtplib
 import string
@@ -16,16 +16,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
-
-
-
-
 app = Flask(__name__)
 uri = os.getenv('MONGODB_URI')
 client = MongoClient(uri)
-db= client.get_database(os.getenv('MONGODB_DBNAME'))
-Doctor_collection=db['Doctor']
+db = client.get_database(os.getenv('MONGODB_DBNAME'))
+Doctor_collection = db['Doctor']
 Student_collection = db['Student']
 organs_collection = db['Organs']
 
@@ -34,15 +29,11 @@ CORS(app)
 EMAIL_USER = os.getenv('EMAIL_USER')
 EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')
 
-
 Doctor_collection.create_index("email", unique=True)
 Doctor_collection.create_index("doctorId", unique=True)
 
-
 Student_collection.create_index("email", unique=True)
 Student_collection.create_index("studentId", unique=True)
-
-
 
 # Admin Configuration
 ADMIN_NAME = os.getenv('ADMIN_NAME')
@@ -61,15 +52,15 @@ ADMIN_HASHED_PASSWORD = generate_password_hash(ADMIN_PASSWORD)
 # Optionally print (remove in production)
 print(f"Admin credentials loaded - Name: {ADMIN_NAME}, ID: {ADMIN_ID}")
 
-
-
 # Initialize the S3 client
-s3= boto3.client('s3', aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-    region_name='eu-north-1'
-)
+s3 = boto3.client('s3', aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+                  aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+                  region_name='eu-north-1'
+                  )
 
 bucket_name = 'images09876'
+
+
 def upload_base64_to_s3(base64_data, file_name):
     try:
         # Decode the Base64 data
@@ -115,12 +106,11 @@ def upload_base64_to_s3(base64_data, file_name):
         return None
 
 
-
-
 def generate_password(length=12):
     """Generates a random password."""
     alphabet = string.ascii_letters + string.digits + string.punctuation
     return ''.join(secrets.choice(alphabet) for _ in range(length))
+
 
 def generate_username(usertype):
     """Generate a username in the format 'student@<number>' or 'doctor@<number>'."""
@@ -134,9 +124,7 @@ def generate_username(usertype):
         raise ValueError("Invalid usertype. Must be 'student' or 'doctor'.")
 
 
-
 def send_email(recipient, username, password):
-
     sender_email = EMAIL_USER
     sender_password = EMAIL_PASSWORD
     message = f"""Subject: Your Login Details
@@ -157,7 +145,6 @@ def send_email(recipient, username, password):
         server.starttls()  # Secure the connection
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, recipient, message)
-
 
 
 def generate_doctor_id():
@@ -284,7 +271,7 @@ def register_student():
                 return jsonify({"error": "Invalid admin credentials"}), 403
             registration_authority = {
                 "doctorname": data['adminName'],  # Stored as doctorname for consistency
-                "doctorId": data['adminId']       # Stored as doctorId for consistency
+                "doctorId": data['adminId']  # Stored as doctorId for consistency
             }
 
         # Generate a unique student ID
@@ -330,6 +317,7 @@ def register_student():
     except Exception as e:
         return jsonify({"error": f"An error occurred during registration: {str(e)}"}), 500
 
+
 def send_student_email(recipient, username, password):
     """Send an email with student login details."""
     sender_email = EMAIL_USER
@@ -355,7 +343,6 @@ def send_student_email(recipient, username, password):
         server.starttls()  # Secure the connection
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, recipient, message)
-
 
 
 @app.route('/login', methods=['POST'])
@@ -425,8 +412,6 @@ def login():
         return jsonify({"error": f"An error occurred during login: {str(e)}"}), 500
 
 
-
-
 def send_reset_email(recipient, usertype):
     """Send an email notifying the user of a successful password reset."""
     sender_email = EMAIL_USER
@@ -451,6 +436,7 @@ def send_reset_email(recipient, usertype):
         server.starttls()  # Secure the connection
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, recipient, message)
+
 
 @app.route('/reset_password', methods=['POST'])
 def reset_password():
@@ -505,10 +491,9 @@ def reset_password():
         return jsonify({"error": f"An error occurred during password reset: {str(e)}"}), 500
 
 
-
-
 def generate_otp():
     return str(random.randint(100000, 999999))
+
 
 @app.route('/forgot-password', methods=['POST'])
 def forgot_password():
@@ -598,11 +583,8 @@ def reset_password_with_otp():
     return jsonify({"error": "Invalid email or OTP"}), 400
 
 
-
-
 # Temporary storage for conditions (in-memory, replace with a database in production)
 temporary_conditions = {}
-
 
 organs_structure = {
     "heart": {
@@ -614,54 +596,56 @@ organs_structure = {
         ]
     },
     "brain": {
-            "parts": [
-                "frontalLobe", "parietalLobe", "temporalLobe", "occipitalLobe",
-                "midbrain", "pons", "medullaOblongata", "cerebellum",
-                "amygdala", "hippocampus", "thalamus", "corpusCallosum",
-                "basalGanglia", "ventricles", "classification"
-            ]
-        },
+        "parts": [
+            "frontalLobe", "parietalLobe", "temporalLobe", "occipitalLobe",
+            "midbrain", "pons", "medullaOblongata", "cerebellum",
+            "amygdala", "hippocampus", "thalamus", "corpusCallosum",
+            "basalGanglia", "ventricles", "classification"
+        ]
+    },
     "spinalcord": {
-                "parts": [
-                    "cervicalRegion", "thoracicRegion", "lumbarRegion", "sacralRegion",
-                    "coccygealRegion", "grayMatter", "whiteMatter", "dorsalRoot",
-                    "ventralRoot", "vertebralColumn", "meninges", "cerebrospinalFluid",
-                    "classification"
-                ]
-            },
+        "parts": [
+            "cervicalRegion", "thoracicRegion", "lumbarRegion", "sacralRegion",
+            "coccygealRegion", "grayMatter", "whiteMatter", "dorsalRoot",
+            "ventralRoot", "vertebralColumn", "meninges", "cerebrospinalFluid",
+            "classification"
+        ]
+    },
     "lung": {
-            "parts": [
-                "rightUpperLobe", "rightMiddleLobe", "rightLowerLobe", "leftUpperLobe",
-                "leftLowerLobe", "mainBronchi", "lobarBronchi", "segmentalBronchi",
-                "visceralPleura", "parietalPleura", "alveoli", "classification"
-            ]
-        },
+        "parts": [
+            "rightUpperLobe", "rightMiddleLobe", "rightLowerLobe", "leftUpperLobe",
+            "leftLowerLobe", "mainBronchi", "lobarBronchi", "segmentalBronchi",
+            "visceralPleura", "parietalPleura", "alveoli", "classification"
+        ]
+    },
     "kidney": {
-            "parts": [
-                "renalCapsule", "hilum", "renalCortex", "renalMedulla", "renalPelvis",
-                "renalCorpuscle", "proximalConvolutedTubule", "loopOfHenle",
-                "distalConvolutedTubule", "collectingDuct", "bloodSupply", "additionalClassification"
-            ]
-        },
+        "parts": [
+            "renalCapsule", "hilum", "renalCortex", "renalMedulla", "renalPelvis",
+            "renalCorpuscle", "proximalConvolutedTubule", "loopOfHenle",
+            "distalConvolutedTubule", "collectingDuct", "bloodSupply", "additionalClassification"
+        ]
+    },
     "skin": {
-            "parts": [
-        "keratinocytes", "melanocytes", "langerhansCells", "merkelCells",
-        "adiposeTissue", "bloodVesselsHypodermis",
-        "collagenElastinFibers", "bloodVesselsDermis", "nerveEndings",
-        "hairFollicles", "sebaceousGlands",
-        "protection", "regulation", "sensation", "metabolism",
-        "excretion", "additionalClassification"
+        "parts": [
+            "keratinocytes", "melanocytes", "langerhansCells", "merkelCells",
+            "adiposeTissue", "bloodVesselsHypodermis",
+            "collagenElastinFibers", "bloodVesselsDermis", "nerveEndings",
+            "hairFollicles", "sebaceousGlands",
+            "protection", "regulation", "sensation", "metabolism",
+            "excretion", "additionalClassification"
 
-            ]
-        },
+        ]
+    },
     "ear": {
         "parts": [
-            "pinna","externalAuditoryCanal","eardrum","ossicles","eustachianTube","cochlea","vestibularSystem","additionalClassification"
+            "pinna", "externalAuditoryCanal", "eardrum", "ossicles", "eustachianTube", "cochlea", "vestibularSystem",
+            "additionalClassification"
         ]
     },
     "eye": {
-        "parts":[
-            "cornea","iris","pupil","lens","retina","opticNerve","vitreousHumor","sclera","choroid","additionalClassification"
+        "parts": [
+            "cornea", "iris", "pupil", "lens", "retina", "opticNerve", "vitreousHumor", "sclera", "choroid",
+            "additionalClassification"
         ]
     },
     "gastrointestinal": {
@@ -719,26 +703,17 @@ organs_structure = {
 
 def validate_organ(organ):
     """Check if the organ exists in the organs_structure dictionary."""
-    return organ.lower() in organs_structure
-
-
-def validate_subpart(organ, subpart):
-    """Check if the subpart exists for the given organ."""
-    organ_data = organs_structure.get(organ.lower())
-    if not organ_data:
+    if organ.lower() not in organs_structure:
         return False
-    return subpart.lower() in [p.lower() for p in organ_data["parts"]]
+    return True
 
 
-@app.route('/add_condition/<organ>/<subpart>', methods=['POST'])
-def add_condition(organ, subpart):
+@app.route('/add_condition/<organ>', methods=['POST'])
+def add_condition(organ):
     try:
-        # Validate organ and subpart names
+        # Validate organ name
         if not validate_organ(organ):
             return jsonify({"error": f"Invalid organ: {organ}"}), 400
-
-        if not validate_subpart(organ, subpart):
-            return jsonify({"error": f"Invalid subpart '{subpart}' for organ '{organ}'"}), 400
 
         data = request.json
         if not data:
@@ -748,119 +723,92 @@ def add_condition(organ, subpart):
         if not student_id:
             return jsonify({"error": "Student ID is required"}), 400
 
-        # Check if the student exists
+        # Check if the student has already submitted conditions for this organ
+        existing_form = organs_collection.find_one(
+            {"studentId": student_id, "organ": organ}
+        )
+        if existing_form:
+            return jsonify({"error": f"Student has already submitted a form for {organ}"}), 400
+
         student = Student_collection.find_one({"studentId": student_id})
         if not student:
             return jsonify({"error": "Student not found"}), 404
 
-        # Check if conditions already exist for this subpart
-        existing_conditions = organs_collection.find_one({
-            "studentId": student_id,
-            "organ": organ,
-            f"subparts.{subpart}.conditions": {"$exists": True}
-        })
+        if student_id not in temporary_conditions:
+            temporary_conditions[student_id] = {}
 
-        if existing_conditions:
-            return jsonify({"error": f"Conditions already exist for {subpart} of {organ}"}), 400
-
-        # Prepare the condition data
-        condition_data = {
-            "clinicalCondition": data.get('clinicalCondition', ''),
-            "symptoms": data.get('symptoms', ''),
-            "signs": data.get('signs', ''),
-            "clinicalObservations": data.get('clinicalObservations', ''),
-            "bloodTests": data.get('bloodTests', ''),
-            "urineTests": data.get('urineTests', ''),
-            "heartRate": data.get('heartRate', ''),
-            "bloodPressure": data.get('bloodPressure', ''),
-            "xRays": data.get('xRays', ''),
-            "mriScans": data.get('mriScans', ''),
-            "studentId":data.get('studentId',''),
-            "added_at": datetime.now()
-        }
-
-        # Check if the organ document already exists for this student
-        organ_doc = organs_collection.find_one({
-            "studentId": student_id,
-            "organ": organ
-        })
-
-        if organ_doc:
-            # Update existing organ document with new subpart conditions
-            update_result = organs_collection.update_one(
-                {"_id": organ_doc["_id"]},
-                {"$set": {
-                    f"subparts.{subpart}.conditions": condition_data,
-                    f"subparts.{subpart}.status": "pending",
-                    "updated_at": datetime.now()
-                }}
-            )
-        else:
-            # Create new organ document
-            organ_data = {
-                "organ": organ,
-                "studentId": student_id,
-                "studentName": student["studentname"],
-                "doctorId": student["doctorId"],
-                "doctorName": student["doctorname"],
-                "created_at": datetime.now(),
-                "updated_at": datetime.now(),
-                "subparts": {
-                    subpart: {
-                        "conditions": condition_data,
-                        "status": "pending",
-                        "submitted_at": None,
-                        "approved_at": None,
-                        "rejected_at": None
+        organ_parts = organs_structure.get(organ, {}).get("parts", [])
+        for part in organ_parts:
+            part_key = f"add{part[0].upper()}{part[1:]}"  # This creates addEpicardium, etc.
+            if part_key in data:
+                for condition in data[part_key]:
+                    condition_entry = {
+                        "clinicalCondition": condition.get('clinicalCondition', ''),
+                        "symptoms": condition.get('symptoms', ''),
+                        "signs": condition.get('signs', ''),
+                        "clinicalObservations": condition.get('clinicalObservations', ''),
+                        "bloodTests": condition.get('bloodTests', ''),
+                        "urineTests": condition.get('urineTests', ''),
+                        "heartRate": condition.get('heartRate', ''),
+                        "bloodPressure": condition.get('bloodPressure', ''),
+                        "xRays": condition.get('xRays', ''),
+                        "mriScans": condition.get('mriScans', '')
                     }
-                }
-            }
-            organs_collection.insert_one(organ_data)
 
-        return jsonify({"message": f"Conditions added successfully for {subpart} of {organ}"}), 201
+                    # Use part_key (e.g., addEpicardium) for storage
+                    if part_key not in temporary_conditions[student_id]:
+                        temporary_conditions[student_id][part_key] = []
+
+                    temporary_conditions[student_id][part_key].append(condition_entry)
+
+        print(f"Temporary conditions after adding for {student_id}: {temporary_conditions}")  # Debug log
+        return jsonify({"message": f"Conditions added successfully for {organ}"}), 201
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-@app.route('/get_clinical_conditions/<subpart>', methods=['GET'])
-def get_clinical_conditions_by_subpart(subpart):
+@app.route('/get_clinical_conditions_by_organ/<organ>', methods=['GET'])
+def get_clinical_conditions_by_organ(organ):
     try:
-        # Fetch all forms that contain the specified subpart
-        forms = organs_collection.find({f"subparts.{subpart}": {"$exists": True}})
+        # Validate organ name
+        if not validate_organ(organ):
+            return jsonify({"error": f"Invalid organ: {organ}"}), 400
+
+        # Fetch all forms for the specified organ
+        forms = organs_collection.find({"organ": organ})
 
         # Prepare the response data
         clinical_conditions = []
         for form in forms:
-            subpart_data = form["subparts"].get(subpart, {})
+            if "conditions" in form and form["conditions"]:  # Check if conditions exist and are not empty
+                # Fetch student details
+                student = Student_collection.find_one({"studentId": form["studentId"]})
+                if not student:
+                    continue  # Skip if student not found
 
-            # Skip if no conditions exist for this subpart
-            if "conditions" not in subpart_data:
-                continue
+                # Iterate through each part and its conditions
+                for part, conditions in form["conditions"].items():
+                    # Remove null fields and empty conditions
+                    cleaned_conditions = []
+                    for condition in conditions:
+                        if condition:  # Check if the condition is not empty
+                            cleaned_condition = {k: v for k, v in condition.items() if v is not None}
+                            if cleaned_condition:  # Ensure the cleaned condition is not empty
+                                cleaned_condition["subpart"] = part  # Add subpart name inside the condition
+                                cleaned_conditions.append(cleaned_condition)
 
-            # Fetch student details
-            student = Student_collection.find_one({"studentId": form["studentId"]})
-            if not student:
-                continue
-
-            # Prepare the condition entry
-            condition_entry = {
-                "studentId": form["studentId"],
-                "studentName": student["studentname"],
-                "doctorId": form.get("doctorId", ""),
-                "doctorName": form.get("doctorName", ""),
-                "organ": form["organ"],
-                "subpart": subpart,
-                "status": subpart_data.get("status", "pending"),
-                "conditions": subpart_data["conditions"],
-                "form": subpart_data.get("form", {}),
-                "added_at": subpart_data["conditions"].get("added_at"),
-                "submitted_at": subpart_data.get("submitted_at"),
-                "approved_at": subpart_data.get("approved_at"),
-                "rejected_at": subpart_data.get("rejected_at")
-            }
-
-            clinical_conditions.append(condition_entry)
+                    # Only include parts with non-empty conditions
+                    if cleaned_conditions:
+                        clinical_conditions.append({
+                            "studentId": student["studentId"],
+                            "studentName": student["studentname"],
+                            "part": part,
+                            "noOfConditions": len(cleaned_conditions),
+                            "conditions": {
+                                f"record{i + 1}": condition for i, condition in enumerate(cleaned_conditions)
+                            }
+                        })
 
         return jsonify(clinical_conditions), 200
 
@@ -868,100 +816,85 @@ def get_clinical_conditions_by_subpart(subpart):
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-@app.route('/submit_form/<organ>/<subpart>', methods=['POST'])
-def submit_form(organ, subpart):
-    try:
-        # Validate organ and subpart names
-        if not validate_organ(organ):
-            return jsonify({"error": f"Invalid organ: {organ}"}), 400
-
-        if not validate_subpart(organ, subpart):
-            return jsonify({"error": f"Invalid subpart '{subpart}' for organ '{organ}'"}), 400
-
-        # Get the raw JSON data first
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "No input data provided"}), 400
-
-        print("Received data:", data)  # Debug log
-
-        student_id = data.get('studentId')
-        if not student_id:
-            return jsonify({"error": "Student ID is required"}), 400
-
-        # Check if the student exists
-        student = Student_collection.find_one({"studentId": student_id})
-        if not student:
-            return jsonify({"error": "Student not found"}), 404
-
-        # Find the organ document
-        organ_doc = organs_collection.find_one({
-            "studentId": student_id,
-            "organ": organ
-        })
-
-        if not organ_doc:
-            return jsonify({"error": f"No document found for {organ}. Add conditions first."}), 404
-
-        # Check if conditions exist for this subpart
-        if subpart not in organ_doc.get("subparts", {}) or "conditions" not in organ_doc["subparts"][subpart]:
-            return jsonify({"error": f"No conditions found for {subpart} of {organ}. Add conditions first."}), 400
-
-        # Prepare the form data for this subpart
-        form_data = {
-            "text": data.get(subpart, ""),  # Text description
-            "submitted_at": datetime.now()
-        }
-
-        # Handle image upload if provided
-        image_field = f"{subpart}Image"
-        if image_field in data and data[image_field]:
-            if not is_valid_base64(data[image_field]):
-                return jsonify({"error": f"Invalid Base64 data in {image_field}"}), 400
-
-            # Upload the image to S3
-            public_url = upload_base64_to_s3(data[image_field], f"{subpart}.jpg")
-            if not public_url:
-                return jsonify({"error": f"Failed to upload {image_field} to S3"}), 500
-
-            form_data["image_url"] = public_url
-
-        # Debug: Print what we're about to update
-        print(f"Updating document {organ_doc['_id']} with form data for {subpart}")
-
-        # Update the organ document with form data for this subpart
-        update_result = organs_collection.update_one(
-            {"_id": organ_doc["_id"]},
-            {
-                "$set": {
-                    f"subparts.{subpart}.form": form_data,
-                    f"subparts.{subpart}.status": "submitted",
-                    f"subparts.{subpart}.submitted_at": datetime.now(),
-                    "updated_at": datetime.now()
-                }
-            }
-        )
-
-        # Debug: Print the update result
-        print(f"Update result: {update_result.modified_count} documents modified")
-
-        if update_result.modified_count == 0:
-            return jsonify({"error": "Failed to update the document"}), 500
-
-        return jsonify({
-            "message": f"Form submitted successfully for {subpart} of {organ}",
-            "status": "submitted"
-        }), 201
-
-    except Exception as e:
-        print(f"Error in submit_form: {str(e)}")
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 def is_valid_base64(data):
     try:
         base64.b64decode(data, validate=True)
         return True
     except Exception:
         return False
+
+
+@app.route('/submit_part/<organ>/<part>', methods=['POST'])
+def submit_part(organ, part):
+    try:
+        # Validate organ name
+        if not validate_organ(organ):
+            return jsonify({"error": f"Invalid organ: {organ}"}), 400
+
+            # Validate part name
+        organ_parts = organs_structure.get(organ, {}).get("parts", [])
+        if part not in organ_parts:
+            return jsonify({"error": f"Invalid part: {part}"}), 400
+
+            # Process input data
+        data = request.json
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
+
+        student_id = data.get('studentId')
+        if not student_id:
+            return jsonify({"error": "Student ID is required"}), 400
+
+        student = Student_collection.find_one({"studentId": student_id})
+        if not student:
+            return jsonify({"error": "Student not found"}), 404
+
+            # Create the organ form entry
+        input_fields = {}
+        input_fields[part] = {
+            "form": {
+                "text": data.get(part, ''),
+                "image_url": None,  # Placeholder for image URL
+                "submitted_at": datetime.now()
+            }
+        }
+
+        # Handling image upload (if exists)
+        image_field = f"{part}Image"
+        if image_field in data and data[image_field]:
+            if not is_valid_base64(data[image_field]):
+                return jsonify({"error": f"Invalid Base64 data in {image_field}"}), 400
+
+                # Upload image to S3
+            public_url = upload_base64_to_s3(data[image_field], f"{part}.jpg")
+            if not public_url:
+                return jsonify({"error": f"Failed to upload {image_field} to S3"}), 500
+
+            input_fields[part]["form"]["image_url"] = public_url
+
+            # Prepare data for insertion
+        organ_data = {
+            "organ": organ,
+            "studentId": student_id,
+            "studentName": student.get('name'),  # Assuming there's a name field
+            "doctorId": data.get('doctorId', ''),  # Optional, can be added from the request
+            "doctorName": data.get('doctorName', ''),  # Optional, can be added from the request
+            "inputfields": input_fields
+        }
+
+        # Insert to the database
+        result = organs_collection.insert_one(organ_data)
+        return jsonify({
+            "message": f"Form submitted successfully for {part} of {organ}",
+            "id": str(result.inserted_id)
+        }), 201
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+
+
 
 @app.route('/count_unapproved_forms', methods=['GET'])
 def count_forms_by_doctor():
@@ -984,6 +917,7 @@ def count_forms_by_doctor():
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
 
 @app.route('/get_unapproved_forms/<organ>', methods=['GET'])
 def get_forms_by_doctor(organ):
@@ -1031,7 +965,7 @@ def get_all_pending_forms():
     try:
         # Find all forms with status "pending"
         forms = list(organs_collection.find({
-            "status": {"$in": ["pending","approved","rejected"]}
+            "status": {"$in": ["pending", "approved", "rejected"]}
         }))
 
         # Gather all student IDs from the forms
@@ -1066,6 +1000,8 @@ def get_all_pending_forms():
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
 @app.route('/fetch_form_details/<form_id>', methods=['GET'])
 def fetch_form_details(form_id):
     try:
@@ -1091,6 +1027,7 @@ def fetch_form_details(form_id):
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
 
 @app.route('/reject_form/<form_id>', methods=['POST'])
 def reject_form(form_id):
@@ -1121,6 +1058,7 @@ def reject_form(form_id):
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
+
 @app.route('/approve_form/<form_id>', methods=['POST'])
 def approve_form(form_id):
     try:
@@ -1136,7 +1074,7 @@ def approve_form(form_id):
         # Fetch the existing form from the database
         existing_form = organs_collection.find_one({"_id": form_object_id})
         print(f"Existing Form: {existing_form}")
-        
+
         if not existing_form:
             return jsonify({"error": "Form not found"}), 404
 
@@ -1173,11 +1111,13 @@ def approve_form(form_id):
         print(f"Error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
+
 @app.route('/get_all_doctors', methods=['GET'])
 def get_all_doctors():
     try:
         # Fetch all doctors from the Doctor collection
-        doctors = Doctor_collection.find({}, {"doctorname": 1, "email": 1, "doctorId": 1, "_id": 0, "specialization": 1})
+        doctors = Doctor_collection.find({},
+                                         {"doctorname": 1, "email": 1, "doctorId": 1, "_id": 0, "specialization": 1})
 
         # Prepare the response data
         doctors_list = []
@@ -1185,15 +1125,14 @@ def get_all_doctors():
             doctors_list.append({
                 "name": doctor["doctorname"],
                 "email": doctor["email"],
-                "doctorId": doctor["doctorId"], # Include doctorId
-                "specialization" : doctor['specialization']
+                "doctorId": doctor["doctorId"],  # Include doctorId
+                "specialization": doctor['specialization']
             })
 
         return jsonify(doctors_list), 200
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
 
 
 @app.route('/get_all_students', methods=['GET'])
@@ -1217,11 +1156,9 @@ def get_all_students():
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-
 @app.route('/get_counts', methods=['GET'])
 def get_counts():
     try:
-
 
         # Count approved forms
         approved_forms = organs_collection.count_documents({"status": "approved"})
@@ -1289,6 +1226,7 @@ def update_doctor(doctorId):
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
+
 @app.route('/delete_doctor/<doctorId>', methods=['DELETE'])
 def delete_doctor(doctorId):
     try:
@@ -1320,7 +1258,6 @@ def update_student(studentId):
         if "email" in data:
             update_data["email"] = data["email"]
 
-
         # Check if there is any data to update
         if not update_data:
             return jsonify({"error": "No fields to update"}), 400
@@ -1339,14 +1276,6 @@ def update_student(studentId):
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
-
-
-
-
-
-
-
 
 
 if __name__ == '__main__':
