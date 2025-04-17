@@ -716,18 +716,29 @@ organs_structure = {
     # Add more organs as needed
 }
 
+
 def validate_organ(organ):
     """Check if the organ exists in the organs_structure dictionary."""
-    if organ.lower() not in organs_structure:
-        return False
-    return True
+    return organ.lower() in organs_structure
 
-@app.route('/add_condition/<organ>', methods=['POST'])
-def add_condition(organ):
+
+def validate_subpart(organ, subpart):
+    """Check if the subpart exists for the given organ."""
+    organ_data = organs_structure.get(organ.lower())
+    if not organ_data:
+        return False
+    return subpart.lower() in [p.lower() for p in organ_data["parts"]]
+
+
+@app.route('/add_condition/<organ>/<subpart>', methods=['POST'])
+def add_condition(organ, subpart):
     try:
-        # Validate organ name
+        # Validate organ and subpart names
         if not validate_organ(organ):
             return jsonify({"error": f"Invalid organ: {organ}"}), 400
+
+        if not validate_subpart(organ, subpart):
+            return jsonify({"error": f"Invalid subpart '{subpart}' for organ '{organ}'"}), 400
 
         data = request.json
         if not data:
@@ -737,93 +748,195 @@ def add_condition(organ):
         if not student_id:
             return jsonify({"error": "Student ID is required"}), 400
 
-        # Check if the student has already submitted conditions for this organ
-        existing_form = organs_collection.find_one(
-            {"studentId": student_id, "organ": organ}
-        )
-        if existing_form:
-            return jsonify({"error": f"Student has already submitted a form for {organ}"}), 400
-
+        # Check if the student exists
         student = Student_collection.find_one({"studentId": student_id})
         if not student:
             return jsonify({"error": "Student not found"}), 404
 
-        if student_id not in temporary_conditions:
-            temporary_conditions[student_id] = {}
+        # Check if conditions already exist for this subpart
+        existing_conditions = organs_collection.find_one({
+            "studentId": student_id,
+            "organ": organ,
+            f"subparts.{subpart}.conditions": {"$exists": True}
+        })
 
-        organ_parts = organs_structure.get(organ, {}).get("parts", [])
-        for part in organ_parts:
-            part_key = f"add{part[0].upper()}{part[1:]}"  # This creates addEpicardium, etc.
-            if part_key in data:
-                for condition in data[part_key]:
-                    condition_entry = {
-                        "clinicalCondition": condition.get('clinicalCondition', ''),
-                        "symptoms": condition.get('symptoms', ''),
-                        "signs": condition.get('signs', ''),
-                        "clinicalObservations": condition.get('clinicalObservations', ''),
-                        "bloodTests": condition.get('bloodTests', ''),
-                        "urineTests": condition.get('urineTests', ''),
-                        "heartRate": condition.get('heartRate', ''),
-                        "bloodPressure": condition.get('bloodPressure', ''),
-                        "xRays": condition.get('xRays', ''),
-                        "mriScans": condition.get('mriScans', '')
+        if existing_conditions:
+            return jsonify({"error": f"Conditions already exist for {subpart} of {organ}"}), 400
+
+        # Prepare the condition data
+        condition_data = {
+            "clinicalCondition": data.get('clinicalCondition', ''),
+            "symptoms": data.get('symptoms', ''),
+            "signs": data.get('signs', ''),
+            "clinicalObservations": data.get('clinicalObservations', ''),
+            "bloodTests": data.get('bloodTests', ''),
+            "urineTests": data.get('urineTests', ''),
+            "heartRate": data.get('heartRate', ''),
+            "bloodPressure": data.get('bloodPressure', ''),
+            "xRays": data.get('xRays', ''),
+            "mriScans": data.get('mriScans', ''),
+            "added_at": datetime.now()
+        }
+
+        # Check if the organ document already exists for this student
+        organ_doc = organs_collection.find_one({
+            "studentId": student_id,
+            "organ": organ
+        })
+
+        if organ_doc:
+            # Update existing organ document with new subpart conditions
+            update_result = organs_collection.update_one(
+                {"_id": organ_doc["_id"]},
+                {"$set": {
+                    f"subparts.{subpart}.conditions": condition_data,
+                    f"subparts.{subpart}.status": "pending",
+                    "updated_at": datetime.now()
+                }}
+            )
+        else:
+            # Create new organ document
+            organ_data = {
+                "organ": organ,
+                "studentId": student_id,
+                "studentName": student["studentname"],
+                "doctorId": student["doctorId"],
+                "doctorName": student["doctorname"],
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
+                "subparts": {
+                    subpart: {
+                        "conditions": condition_data,
+                        "status": "pending",
+                        "submitted_at": None,
+                        "approved_at": None,
+                        "rejected_at": None
                     }
+                }
+            }
+            organs_collection.insert_one(organ_data)
 
-                    # Use part_key (e.g., addEpicardium) for storage
-                    if part_key not in temporary_conditions[student_id]:
-                        temporary_conditions[student_id][part_key] = []
-
-                    temporary_conditions[student_id][part_key].append(condition_entry)
-
-        print(f"Temporary conditions after adding for {student_id}: {temporary_conditions}")  # Debug log
-        return jsonify({"message": f"Conditions added successfully for {organ}"}), 201
+        return jsonify({"message": f"Conditions added successfully for {subpart} of {organ}"}), 201
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
-@app.route('/get_clinical_conditions_by_organ/<organ>', methods=['GET'])
-def get_clinical_conditions_by_organ(organ):
-    try:
-        # Validate organ name
-        if not validate_organ(organ):
-            return jsonify({"error": f"Invalid organ: {organ}"}), 400
 
-        # Fetch all forms for the specified organ
-        forms = organs_collection.find({"organ": organ})
+@app.route('/get_clinical_conditions/<subpart>', methods=['GET'])
+def get_clinical_conditions_by_subpart(subpart):
+    try:
+        # Fetch all forms that contain the specified subpart
+        forms = organs_collection.find({f"subparts.{subpart}": {"$exists": True}})
 
         # Prepare the response data
         clinical_conditions = []
         for form in forms:
-            if "conditions" in form and form["conditions"]:  # Check if conditions exist and are not empty
-                # Fetch student details
-                student = Student_collection.find_one({"studentId": form["studentId"]})
-                if not student:
-                    continue  # Skip if student not found
+            subpart_data = form["subparts"].get(subpart, {})
 
-                # Iterate through each part and its conditions
-                for part, conditions in form["conditions"].items():
-                    # Remove null fields and empty conditions
-                    cleaned_conditions = []
-                    for condition in conditions:
-                        if condition:  # Check if the condition is not empty
-                            cleaned_condition = {k: v for k, v in condition.items() if v is not None}
-                            if cleaned_condition:  # Ensure the cleaned condition is not empty
-                                cleaned_condition["subpart"] = part  # Add subpart name inside the condition
-                                cleaned_conditions.append(cleaned_condition)
+            # Skip if no conditions exist for this subpart
+            if "conditions" not in subpart_data:
+                continue
 
-                    # Only include parts with non-empty conditions
-                    if cleaned_conditions:
-                        clinical_conditions.append({
-                            "studentId": student["studentId"],
-                            "studentName": student["studentname"],
-                            "part": part,
-                            "noOfConditions": len(cleaned_conditions),
-                            "conditions": {
-                                f"record{i+1}": condition for i, condition in enumerate(cleaned_conditions)
-                            }
-                        })
+            # Fetch student details
+            student = Student_collection.find_one({"studentId": form["studentId"]})
+            if not student:
+                continue
+
+            # Prepare the condition entry
+            condition_entry = {
+                "studentId": form["studentId"],
+                "studentName": student["studentname"],
+                "doctorId": form.get("doctorId", ""),
+                "doctorName": form.get("doctorName", ""),
+                "organ": form["organ"],
+                "subpart": subpart,
+                "status": subpart_data.get("status", "pending"),
+                "conditions": subpart_data["conditions"],
+                "form": subpart_data.get("form", {}),
+                "added_at": subpart_data["conditions"].get("added_at"),
+                "submitted_at": subpart_data.get("submitted_at"),
+                "approved_at": subpart_data.get("approved_at"),
+                "rejected_at": subpart_data.get("rejected_at")
+            }
+
+            clinical_conditions.append(condition_entry)
 
         return jsonify(clinical_conditions), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+@app.route('/submit_form/<organ>/<subpart>', methods=['POST'])
+def submit_form(organ, subpart):
+    try:
+        # Validate organ and subpart names
+        if not validate_organ(organ):
+            return jsonify({"error": f"Invalid organ: {organ}"}), 400
+
+        if not validate_subpart(organ, subpart):
+            return jsonify({"error": f"Invalid subpart '{subpart}' for organ '{organ}'"}), 400
+
+        data = request.json
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
+
+        student_id = data.get('studentId')
+        if not student_id:
+            return jsonify({"error": "Student ID is required"}), 400
+
+        # Check if the student exists
+        student = Student_collection.find_one({"studentId": student_id})
+        if not student:
+            return jsonify({"error": "Student not found"}), 404
+
+        # Find the organ document
+        organ_doc = organs_collection.find_one({
+            "studentId": student_id,
+            "organ": organ
+        })
+
+        if not organ_doc:
+            return jsonify({"error": f"No document found for {organ}. Add conditions first."}), 404
+
+        # Check if conditions exist for this subpart
+        if subpart not in organ_doc.get("subparts", {}) or "conditions" not in organ_doc["subparts"][subpart]:
+            return jsonify({"error": f"No conditions found for {subpart} of {organ}. Add conditions first."}), 400
+
+        # Prepare the form data for this subpart
+        form_data = {
+            "text": data.get(subpart, ""),  # Text description
+            "submitted_at": datetime.now()
+        }
+
+        # Handle image upload if provided
+        image_field = f"{subpart}Image"
+        if image_field in data and data[image_field]:
+            if not is_valid_base64(data[image_field]):
+                return jsonify({"error": f"Invalid Base64 data in {image_field}"}), 400
+
+            # Upload the image to S3
+            public_url = upload_base64_to_s3(data[image_field], f"{subpart}.jpg")
+            if not public_url:
+                return jsonify({"error": f"Failed to upload {image_field} to S3"}), 500
+
+            form_data["image_url"] = public_url
+
+        # Update the organ document with form data for this subpart
+        update_result = organs_collection.update_one(
+            {"_id": organ_doc["_id"]},
+            {"$set": {
+                f"subparts.{subpart}.form": form_data,
+                f"subparts.{subpart}.status": "submitted",
+                f"subparts.{subpart}.submitted_at": datetime.now(),
+                "updated_at": datetime.now()
+            }}
+        )
+
+        return jsonify({
+            "message": f"Form submitted successfully for {subpart} of {organ}",
+            "status": "submitted"
+        }), 201
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
@@ -835,93 +948,7 @@ def is_valid_base64(data):
         return True
     except Exception:
         return False
-@app.route('/submit_form/<organ>', methods=['POST'])
-def submit_form(organ):
-    try:
-        # Validate organ name
-        if not validate_organ(organ):
-            return jsonify({"error": f"Invalid organ: {organ}"}), 400
 
-        data = request.json
-        if not data:
-            return jsonify({"error": "No input data provided"}), 400
-
-        student_id = data.get('studentId')
-        if not student_id:
-            return jsonify({"error": "Student ID is required"}), 400
-
-        # Check if the student has already submitted a form for this organ
-        existing_form = organs_collection.find_one({"studentId": student_id, "organ": organ})
-        if existing_form:
-            return jsonify({"error": f"Student has already submitted a form for {organ}"}), 400
-
-        # Check database connection
-        if Student_collection is None or organs_collection is None:
-            return jsonify({"error": "Database connection failed"}), 500
-
-        student = Student_collection.find_one({"studentId": student_id})
-        if not student:
-            return jsonify({"error": "Student not found"}), 404
-
-        timestamp = datetime.now()
-        organ_data = {
-            "organ": organ,
-            "studentId": student_id,
-            "status": "pending",
-            "timestamp": timestamp
-        }
-
-        # Add organ-specific text fields and image fields
-        organ_parts = organs_structure.get(organ, {}).get("parts", [])
-        input_fields = {}
-
-        for part in organ_parts:
-            # Store text field (if provided)
-            if part in data:
-                input_fields[part] = data.get(part, "")
-
-            # Store Base64-encoded image field (if provided and valid)
-            image_field = f"{part}Image"
-            if image_field in data and data[image_field]:  # Check if the field exists and is not empty
-                if not is_valid_base64(data[image_field]):
-                    return jsonify({"error": f"Invalid Base64 data in {image_field}"}), 400
-
-                # Upload the image to S3 and get the public URL
-                public_url = upload_base64_to_s3(data[image_field], f"{part}.jpg")
-                if not public_url:
-                    return jsonify({"error": f"Failed to upload {image_field} to S3"}), 500
-
-                # Store the public URL for the specific image field
-                input_fields[image_field] = public_url
-
-        organ_data["inputfields"] = input_fields
-
-        # Add conditions if they exist
-        if student_id in temporary_conditions:
-            organ_data["conditions"] = temporary_conditions[student_id]
-            del temporary_conditions[student_id]
-        else:
-            organ_data["conditions"] = {}
-
-        # Log the data to be inserted
-        print("Organ Data to be inserted:", organ_data)
-
-        # Insert the form into the Organs collection
-        result = organs_collection.insert_one(organ_data)
-        print("Insertion result:", result.inserted_id)
-
-        if result.inserted_id:
-            return jsonify({
-                "message": f"Form submitted successfully for {organ}",
-                "id": str(result.inserted_id),
-                "timestamp": timestamp
-            }), 201
-        else:
-            return jsonify({"error": "Failed to submit data"}), 500
-
-    except Exception as e:
-        print("Error:", str(e))
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 @app.route('/count_unapproved_forms', methods=['GET'])
 def count_forms_by_doctor():
     try:
