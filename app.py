@@ -775,6 +775,7 @@ def add_condition(organ, subpart):
             "bloodPressure": data.get('bloodPressure', ''),
             "xRays": data.get('xRays', ''),
             "mriScans": data.get('mriScans', ''),
+            "studentId":data.get('studentId',''),
             "added_at": datetime.now()
         }
 
