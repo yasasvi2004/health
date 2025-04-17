@@ -878,9 +878,12 @@ def submit_form(organ, subpart):
         if not validate_subpart(organ, subpart):
             return jsonify({"error": f"Invalid subpart '{subpart}' for organ '{organ}'"}), 400
 
-        data = request.json
+        # Get the raw JSON data first
+        data = request.get_json()
         if not data:
             return jsonify({"error": "No input data provided"}), 400
+
+        print("Received data:", data)  # Debug log
 
         student_id = data.get('studentId')
         if not student_id:
@@ -923,16 +926,27 @@ def submit_form(organ, subpart):
 
             form_data["image_url"] = public_url
 
+        # Debug: Print what we're about to update
+        print(f"Updating document {organ_doc['_id']} with form data for {subpart}")
+
         # Update the organ document with form data for this subpart
         update_result = organs_collection.update_one(
             {"_id": organ_doc["_id"]},
-            {"$set": {
-                f"subparts.{subpart}.form": form_data,
-                f"subparts.{subpart}.status": "submitted",
-                f"subparts.{subpart}.submitted_at": datetime.now(),
-                "updated_at": datetime.now()
-            }}
+            {
+                "$set": {
+                    f"subparts.{subpart}.form": form_data,
+                    f"subparts.{subpart}.status": "submitted",
+                    f"subparts.{subpart}.submitted_at": datetime.now(),
+                    "updated_at": datetime.now()
+                }
+            }
         )
+
+        # Debug: Print the update result
+        print(f"Update result: {update_result.modified_count} documents modified")
+
+        if update_result.modified_count == 0:
+            return jsonify({"error": "Failed to update the document"}), 500
 
         return jsonify({
             "message": f"Form submitted successfully for {subpart} of {organ}",
@@ -940,9 +954,8 @@ def submit_form(organ, subpart):
         }), 201
 
     except Exception as e:
+        print(f"Error in submit_form: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
-
 def is_valid_base64(data):
     try:
         base64.b64decode(data, validate=True)
