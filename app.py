@@ -832,6 +832,12 @@ def add_condition(organ, part):
             "symptoms": data.get('symptoms'),
             "signs": data.get('signs'),
             "clinicalObservations": data.get('clinicalObservations'),
+            "bloodTests": data.get('bloodTests', ''),
+            "urineTests": data.get('urineTests', ''),
+            "heartRate": data.get('heartRate', ''),
+            "bloodPressure": data.get('bloodPressure', ''),
+            "xRays": data.get('xRays', ''),
+            "mriScans": data.get('mriScans', ''),
             "added_at": datetime.now(),
             "added_by": data.get('doctorId')
         }
