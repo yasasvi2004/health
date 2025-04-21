@@ -583,8 +583,7 @@ def reset_password_with_otp():
     return jsonify({"error": "Invalid email or OTP"}), 400
 
 
-# Temporary storage for conditions (in-memory, replace with a database in production)
-temporary_conditions = {}
+
 
 organs_structure = {
     "heart": {
@@ -794,6 +793,149 @@ def count_forms_by_doctor():
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
+temporary_conditions = {}
+
+
+@app.route('/add_condition/<organ>/<part>', methods=['POST'])
+def add_condition(organ, part):
+    try:
+        # Validate organ and part
+        if not validate_organ(organ):
+            return jsonify({"error": f"Invalid organ: {organ}"}), 400
+
+        organ_parts = organs_structure.get(organ, {}).get("parts", [])
+        if part not in organ_parts:
+            return jsonify({"error": f"Invalid part: {part}"}), 400
+
+        data = request.json
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
+
+        student_id = data.get('studentId')
+        if not student_id:
+            return jsonify({"error": "Student ID is required"}), 400
+
+        student = Student_collection.find_one({"studentId": student_id})
+        if not student:
+            return jsonify({"error": "Student not found"}), 404
+
+        # Initialize temporary storage structure if not exists
+        if student_id not in temporary_conditions:
+            temporary_conditions[student_id] = {}
+        if organ not in temporary_conditions[student_id]:
+            temporary_conditions[student_id][organ] = {}
+        if part not in temporary_conditions[student_id][organ]:
+            temporary_conditions[student_id][organ][part] = []
+
+        # Check if we're submitting or just adding to temp storage
+        if data.get('submit', False):
+            # Verify we have conditions to submit
+            if not temporary_conditions[student_id][organ][part]:
+                return jsonify({"error": "No conditions found to submit"}), 400
+
+            # Find or create the organ document
+            organ_doc = organs_collection.find_one({"studentId": student_id, "organ": organ})
+
+            if not organ_doc:
+                # Create new document with proper structure
+                organ_doc = {
+                    "studentId": student_id,
+                    "organ": organ,
+                    "studentName": student.get('studentname'),
+                    "doctorId": data.get('doctorId', ''),
+                    "doctorName": data.get('doctorName', ''),
+                    "inputfields": {},
+                    "conditions": {part: []}  # Initialize with empty array for this part
+                }
+                result = organs_collection.insert_one(organ_doc)
+                organ_doc['_id'] = result.inserted_id
+            else:
+                # Ensure conditions field exists and has the part array
+                if 'conditions' not in organ_doc:
+                    organs_collection.update_one(
+                        {"_id": organ_doc['_id']},
+                        {"$set": {"conditions": {part: []}}}
+                    )
+                elif part not in organ_doc.get('conditions', {}):
+                    organs_collection.update_one(
+                        {"_id": organ_doc['_id']},
+                        {"$set": {f"conditions.{part}": []}}
+                    )
+
+            # Add all conditions from temporary storage
+            for condition in temporary_conditions[student_id][organ][part]:
+                condition_entry = {
+                    "clinicalCondition": condition.get("clinicalCondition", ''),
+                    "symptoms": condition.get("symptoms", ''),
+                    "signs": condition.get("signs", ''),
+                    "clinicalObservations": condition.get("clinicalObservations", ''),
+                    "bloodTests": condition.get("bloodTests", ''),
+                    "urineTests": condition.get("urineTests", ''),
+                    "heartRate": condition.get("heartRate", ''),
+                    "bloodPressure": condition.get("bloodPressure", ''),
+                    "xRays": condition.get("xRays", ''),
+                    "mriScans": condition.get("mriScans", ''),
+                    "added_at": datetime.now(),
+                    "added_by": data.get('doctorId', ''),
+                    "doctorName": data.get('doctorName', '')
+                }
+
+                # Update the document
+                update_result = organs_collection.update_one(
+                    {"_id": organ_doc['_id']},
+                    {
+                        "$push": {f"conditions.{part}": condition_entry},
+                        "$set": {
+                            "studentName": student.get('studentname'),
+                            "doctorId": data.get('doctorId', organ_doc.get('doctorId', '')),
+                            "doctorName": data.get('doctorName', organ_doc.get('doctorName', ''))
+                        }
+                    }
+                )
+
+                if update_result.modified_count == 0:
+                    return jsonify({"error": "Failed to update conditions"}), 500
+
+            # Clear temporary storage after successful submission
+            temporary_conditions[student_id][organ][part] = []
+
+            return jsonify({
+                "message": "Conditions submitted successfully",
+                "conditions_added": len(temporary_conditions[student_id][organ][part]),
+                "document_id": str(organ_doc['_id'])
+            }), 200
+        else:
+            # Add to temporary storage
+            condition_entry = {
+                "clinicalCondition": data.get('clinicalCondition', ''),
+                "symptoms": data.get('symptoms', ''),
+                "signs": data.get('signs', ''),
+                "clinicalObservations": data.get('clinicalObservations', ''),
+                "bloodTests": data.get('bloodTests', ''),
+                "urineTests": data.get('urineTests', ''),
+                "heartRate": data.get('heartRate', ''),
+                "bloodPressure": data.get('bloodPressure', ''),
+                "xRays": data.get('xRays', ''),
+                "mriScans": data.get('mriScans', ''),
+                "doctorId": data.get('doctorId', ''),
+                "doctorName": data.get('doctorName', '')
+            }
+
+            temporary_conditions[student_id][organ][part].append(condition_entry)
+
+            return jsonify({
+                "message": "Condition added to temporary storage",
+                "count": len(temporary_conditions[student_id][organ][part]),
+                "student_id": student_id,
+                "organ": organ,
+                "part": part
+            }), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+
 @app.route('/submit_form/<organ>/<part>', methods=['POST'])
 def submit_part(organ, part):
     try:
@@ -815,11 +957,11 @@ def submit_part(organ, part):
         if not student:
             return jsonify({"error": "Student not found"}), 404
 
-        # Prepare form data
+            # Prepare form data
         form_data = {
             "text": data.get(part, ''),
             "image_url": None,
-            "submitted_at": datetime.now()
+            "submitted_at": datetime.now()  # Consider timezone awareness
         }
 
         # Handle image upload
@@ -827,12 +969,14 @@ def submit_part(organ, part):
         if image_field in data and data[image_field]:
             if not is_valid_base64(data[image_field]):
                 return jsonify({"error": f"Invalid Base64 data in {image_field}"}), 400
+
             public_url = upload_base64_to_s3(data[image_field], f"{part}.jpg")
             if not public_url:
                 return jsonify({"error": f"Failed to upload {image_field} to S3"}), 500
+
             form_data["image_url"] = public_url
 
-        # Find or create document
+            # Find or create document
         existing_form = organs_collection.find_one({"studentId": student_id, "organ": organ})
 
         if existing_form:
@@ -853,7 +997,7 @@ def submit_part(organ, part):
                 "id": str(existing_form["_id"])
             }), 200
         else:
-            # Create new document with both inputfields and conditions
+            # Create new document
             new_doc = {
                 "organ": organ,
                 "studentId": student_id,
@@ -868,115 +1012,6 @@ def submit_part(organ, part):
                 "message": f"Form submitted successfully for {part} of {organ}",
                 "id": str(result.inserted_id)
             }), 201
-
-    except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
-
-@app.route('/add_condition/<student_id>/<organ>/<part>', methods=['POST'])
-def manage_conditions(student_id, organ, part):
-    try:
-        # Validate input data
-        data = request.json
-        if not data:
-            return jsonify({"error": "No input data provided"}), 400
-
-        # Check if submitting or just adding to temp storage
-        if data.get('submit', False):
-            # Verify we have conditions to submit
-            if (not temporary_conditions.get(student_id, {}).get(organ, {}).get(part)):
-                return jsonify({"error": "No conditions found to submit"}), 400
-
-            # Get or create the organ document
-            organ_doc = organs_collection.find_one({"studentId": student_id, "organ": organ})
-
-            if not organ_doc:
-                # Create new document if doesn't exist
-                organ_doc = {
-                    "studentId": student_id,
-                    "organ": organ,
-                    "studentName": data.get('studentName', ''),
-                    "doctorId": data.get('doctorId', ''),
-                    "doctorName": data.get('doctorName', ''),
-                    "inputfields": {},  # Initialize empty inputfields
-                    "conditions": {}
-                }
-                result = organs_collection.insert_one(organ_doc)
-                organ_doc['_id'] = result.inserted_id
-
-            # Prepare conditions to add
-            conditions_to_add = []
-            for condition in temporary_conditions[student_id][organ][part]:
-                conditions_to_add.append({
-                    "clinicalCondition": condition.get("clinicalCondition", ''),
-                    "symptoms": condition.get("symptoms", ''),
-                    "bloodTests": condition.get("bloodTests", ''),
-                    "urineTests": condition.get("urineTests", ''),
-                    "heartRate": condition.get("heartRate", ''),
-                    "bloodPressure": condition.get("bloodPressure", ''),
-                    "xRays": condition.get("xRays", ''),
-                    "mriScans": condition.get("mriScans", ''),
-                    "added_at": datetime.now(),
-                    "added_by": condition.get('doctorId', ''),
-                    "doctorName": condition.get('doctorName', '')
-                })
-
-            # Update the document with new conditions
-            update_result = organs_collection.update_one(
-                {"_id": organ_doc['_id']},
-                {
-                    "$set": {
-                        "studentName": data.get('studentName', organ_doc.get('studentName', '')),
-                        "doctorId": data.get('doctorId', organ_doc.get('doctorId', '')),
-                        "doctorName": data.get('doctorName', organ_doc.get('doctorName', ''))
-                    },
-                    "$push": {
-                        f"conditions.{part}": {"$each": conditions_to_add}
-                    }
-                }
-            )
-
-            if update_result.modified_count == 0 and len(conditions_to_add) > 0:
-                return jsonify({"error": "Failed to update conditions"}), 500
-
-            # Clear temporary storage
-            temporary_conditions[student_id][organ][part] = []
-
-            return jsonify({
-                "message": "Conditions submitted successfully",
-                "conditions_added": len(conditions_to_add),
-                "document_id": str(organ_doc['_id'])
-            }), 200
-        else:
-            # Add to temporary storage
-            if student_id not in temporary_conditions:
-                temporary_conditions[student_id] = {}
-            if organ not in temporary_conditions[student_id]:
-                temporary_conditions[student_id][organ] = {}
-            if part not in temporary_conditions[student_id][organ]:
-                temporary_conditions[student_id][organ][part] = []
-
-            condition_entry = {
-                "clinicalCondition": data.get('clinicalCondition', ''),
-                "symptoms": data.get('symptoms', ''),
-                "signs": data.get('signs', ''),
-                "clinicalObservations": data.get('clinicalObservations', ''),
-                "bloodTests": data.get('bloodTests', ''),
-                "urineTests": data.get('urineTests', ''),
-                "heartRate": data.get('heartRate', ''),
-                "bloodPressure": data.get('bloodPressure', ''),
-                "xRays": data.get('xRays', ''),
-                "mriScans": data.get('mriScans', ''),
-                "doctorId": data.get('doctorId', ''),
-                "doctorName": data.get('doctorName', '')
-            }
-
-            temporary_conditions[student_id][organ][part].append(condition_entry)
-
-            return jsonify({
-                "message": "Condition added to temporary storage",
-                "count": len(temporary_conditions[student_id][organ][part])
-            }), 200
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
