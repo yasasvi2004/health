@@ -707,7 +707,8 @@ def validate_organ(organ):
         return False
     return True
 
-
+# Temporary conditions storage
+temporary_conditions = {}
 
 
 
@@ -766,95 +767,6 @@ def is_valid_base64(data):
     except Exception:
         return False
 
-@app.route('/submit_form/<organ>/<part>', methods=['POST'])
-def submit_part(organ, part):
-    try:
-        # Validate organ name
-        if not validate_organ(organ):
-            return jsonify({"error": f"Invalid organ: {organ}"}), 400
-
-        # Validate part name
-        organ_parts = organs_structure.get(organ, {}).get("parts", [])
-        if part not in organ_parts:
-            return jsonify({"error": f"Invalid part: {part}"}), 400
-
-        # Process input data
-        data = request.json
-        if not data:
-            return jsonify({"error": "No input data provided"}), 400
-
-        student_id = data.get('studentId')
-        if not student_id:
-            return jsonify({"error": "Student ID is required"}), 400
-
-        student = Student_collection.find_one({"studentId": student_id})
-        if not student:
-            return jsonify({"error": "Student not found"}), 404
-
-        # Check if there's an existing form for this organ and student
-        existing_form = organs_collection.find_one({
-            "organ": organ,
-            "studentId": student_id
-        })
-
-        # Prepare the update data
-        update_data = {
-            "form": {
-                "text": data.get(part, ''),
-                "image_url": None,
-                "submitted_at": datetime.now()
-            }
-        }
-
-        # Handle image upload if exists
-        image_field = f"{part}Image"
-        if image_field in data and data[image_field]:
-            if not is_valid_base64(data[image_field]):
-                return jsonify({"error": f"Invalid Base64 data in {image_field}"}), 400
-
-            # Upload image to S3
-            public_url = upload_base64_to_s3(data[image_field], f"{part}.jpg")
-            if not public_url:
-                return jsonify({"error": f"Failed to upload {image_field} to S3"}), 500
-
-            update_data["form"]["image_url"] = public_url
-
-        if existing_form:
-            # Update existing document
-            result = organs_collection.update_one(
-                {"_id": existing_form["_id"]},
-                {
-                    "$set": {
-                        f"inputfields.{part}": update_data,
-                        "doctorId": data.get('doctorId', existing_form.get('doctorId', '')),
-                        "doctorName": data.get('doctorName', existing_form.get('doctorName', ''))
-                    }
-                }
-            )
-            return jsonify({
-                "message": f"Form updated successfully for {part} of {organ}",
-                "id": str(existing_form["_id"])
-            }), 200
-        else:
-            # Create new document
-            organ_data = {
-                "organ": organ,
-                "studentId": student_id,
-                "studentName": student.get('name'),
-                "doctorId": data.get('doctorId', ''),
-                "doctorName": data.get('doctorName', ''),
-                "inputfields": {
-                    part: update_data
-                }
-            }
-            result = organs_collection.insert_one(organ_data)
-            return jsonify({
-                "message": f"Form submitted successfully for {part} of {organ}",
-                "id": str(result.inserted_id)
-            }), 201
-
-    except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
 
@@ -882,51 +794,122 @@ def count_forms_by_doctor():
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-from flask import Flask, request, jsonify
-from datetime import datetime
+@app.route('/submit_form/<organ>/<part>', methods=['POST'])
+def submit_part(organ, part):
+    try:
+        # Validate organ and part
+        if not validate_organ(organ):
+            return jsonify({"error": f"Invalid organ: {organ}"}), 400
+        if part not in organs_structure.get(organ, {}).get("parts", []):
+            return jsonify({"error": f"Invalid part: {part}"}), 400
 
-app = Flask(__name__)
+        data = request.json
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
 
-# Temporary conditions storage
-temporary_conditions = {}
+        student_id = data.get('studentId')
+        if not student_id:
+            return jsonify({"error": "Student ID is required"}), 400
+
+        student = Student_collection.find_one({"studentId": student_id})
+        if not student:
+            return jsonify({"error": "Student not found"}), 404
+
+        # Prepare form data
+        form_data = {
+            "text": data.get(part, ''),
+            "image_url": None,
+            "submitted_at": datetime.now()
+        }
+
+        # Handle image upload
+        image_field = f"{part}Image"
+        if image_field in data and data[image_field]:
+            if not is_valid_base64(data[image_field]):
+                return jsonify({"error": f"Invalid Base64 data in {image_field}"}), 400
+            public_url = upload_base64_to_s3(data[image_field], f"{part}.jpg")
+            if not public_url:
+                return jsonify({"error": f"Failed to upload {image_field} to S3"}), 500
+            form_data["image_url"] = public_url
+
+        # Find or create document
+        existing_form = organs_collection.find_one({"studentId": student_id, "organ": organ})
+
+        if existing_form:
+            # Update existing document
+            update_result = organs_collection.update_one(
+                {"_id": existing_form["_id"]},
+                {
+                    "$set": {
+                        f"inputfields.{part}": form_data,
+                        "doctorId": data.get('doctorId', existing_form.get('doctorId', '')),
+                        "doctorName": data.get('doctorName', existing_form.get('doctorName', '')),
+                        "conditions": existing_form.get("conditions", {})  # Preserve existing conditions
+                    }
+                }
+            )
+            return jsonify({
+                "message": f"Form updated successfully for {part} of {organ}",
+                "id": str(existing_form["_id"])
+            }), 200
+        else:
+            # Create new document with both inputfields and conditions
+            new_doc = {
+                "organ": organ,
+                "studentId": student_id,
+                "studentName": student.get('name'),
+                "doctorId": data.get('doctorId', ''),
+                "doctorName": data.get('doctorName', ''),
+                "inputfields": {part: form_data},
+                "conditions": {}  # Initialize empty conditions
+            }
+            result = organs_collection.insert_one(new_doc)
+            return jsonify({
+                "message": f"Form submitted successfully for {part} of {organ}",
+                "id": str(result.inserted_id)
+            }), 201
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
 @app.route('/add_condition/<student_id>/<organ>/<part>', methods=['POST'])
 def manage_conditions(student_id, organ, part):
     try:
-        # Validate organ and part (implement your own validation logic)
-
-        # Process input data
+        # Validate input data
         data = request.json
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
 
-        # Initialize temporary storage if not already present
-        if student_id not in temporary_conditions:
-            temporary_conditions[student_id] = {}
-        if organ not in temporary_conditions[student_id]:
-            temporary_conditions[student_id][organ] = {}
-        if part not in temporary_conditions[student_id][organ]:
-            temporary_conditions[student_id][organ][part] = []
+        # Check if submitting or just adding to temp storage
+        if data.get('submit', False):
+            # Verify we have conditions to submit
+            if (not temporary_conditions.get(student_id, {}).get(organ, {}).get(part)):
+                return jsonify({"error": "No conditions found to submit"}), 400
 
-            # Check if we're submitting or adding new conditions
-        if data.get('submit', False):  # Check if the request indicates a submission
-            # Check if there are conditions to submit
-            if student_id not in temporary_conditions or organ not in temporary_conditions[student_id] or part not in \
-                    temporary_conditions[student_id][organ]:
-                return jsonify({"error": "No conditions found for this student and organ"}), 404
+            # Get or create the organ document
+            organ_doc = organs_collection.find_one({"studentId": student_id, "organ": organ})
 
-            organ_data = organs_collection.find_one({"studentId": student_id, "organ": organ})
+            if not organ_doc:
+                # Create new document if doesn't exist
+                organ_doc = {
+                    "studentId": student_id,
+                    "organ": organ,
+                    "studentName": data.get('studentName', ''),
+                    "doctorId": data.get('doctorId', ''),
+                    "doctorName": data.get('doctorName', ''),
+                    "inputfields": {},  # Initialize empty inputfields
+                    "conditions": {}
+                }
+                result = organs_collection.insert_one(organ_doc)
+                organ_doc['_id'] = result.inserted_id
 
-            if not organ_data:
-                return jsonify({"error": "Organ data not found for this student"}), 404
-
-                # Submit conditions to the database
+            # Prepare conditions to add
+            conditions_to_add = []
             for condition in temporary_conditions[student_id][organ][part]:
-                # Create the condition entry with timestamp
-                condition_entry = {
+                conditions_to_add.append({
                     "clinicalCondition": condition.get("clinicalCondition", ''),
                     "symptoms": condition.get("symptoms", ''),
-                    "signs": condition.get("signs", ''),
-                    "clinicalObservations": condition.get("clinicalObservations", ''),
                     "bloodTests": condition.get("bloodTests", ''),
                     "urineTests": condition.get("urineTests", ''),
                     "heartRate": condition.get("heartRate", ''),
@@ -936,28 +919,43 @@ def manage_conditions(student_id, organ, part):
                     "added_at": datetime.now(),
                     "added_by": condition.get('doctorId', ''),
                     "doctorName": condition.get('doctorName', '')
+                })
+
+            # Update the document with new conditions
+            update_result = organs_collection.update_one(
+                {"_id": organ_doc['_id']},
+                {
+                    "$set": {
+                        "studentName": data.get('studentName', organ_doc.get('studentName', '')),
+                        "doctorId": data.get('doctorId', organ_doc.get('doctorId', '')),
+                        "doctorName": data.get('doctorName', organ_doc.get('doctorName', ''))
+                    },
+                    "$push": {
+                        f"conditions.{part}": {"$each": conditions_to_add}
+                    }
                 }
+            )
 
-                # Prepare the update query
-                update_query = {
-                    "$setOnInsert": {"conditions": {}},
-                    "$push": {f"conditions.{part}": condition_entry}
-                }
+            if update_result.modified_count == 0 and len(conditions_to_add) > 0:
+                return jsonify({"error": "Failed to update conditions"}), 500
 
-                # Update the document in the database
-                organs_collection.update_one(
-                    {"_id": organ_data["_id"]},
-                    update_query,
-                    upsert=True
-                )
-
-                # Clear the temporary conditions after successful submission
+            # Clear temporary storage
             temporary_conditions[student_id][organ][part] = []
 
-            return jsonify({"message": "Conditions submitted successfully"}), 201
-
+            return jsonify({
+                "message": "Conditions submitted successfully",
+                "conditions_added": len(conditions_to_add),
+                "document_id": str(organ_doc['_id'])
+            }), 200
         else:
-            # Add new condition to temporary storage
+            # Add to temporary storage
+            if student_id not in temporary_conditions:
+                temporary_conditions[student_id] = {}
+            if organ not in temporary_conditions[student_id]:
+                temporary_conditions[student_id][organ] = {}
+            if part not in temporary_conditions[student_id][organ]:
+                temporary_conditions[student_id][organ][part] = []
+
             condition_entry = {
                 "clinicalCondition": data.get('clinicalCondition', ''),
                 "symptoms": data.get('symptoms', ''),
@@ -973,13 +971,20 @@ def manage_conditions(student_id, organ, part):
                 "doctorName": data.get('doctorName', '')
             }
 
-            # Append the condition to the temporary storage
             temporary_conditions[student_id][organ][part].append(condition_entry)
 
-            return jsonify({"message": "Condition added to temporary storage"}), 201
+            return jsonify({
+                "message": "Condition added to temporary storage",
+                "count": len(temporary_conditions[student_id][organ][part])
+            }), 200
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+
+
+
 
 @app.route('/get_unapproved_forms/<organ>', methods=['GET'])
 def get_forms_by_doctor(organ):
@@ -1338,6 +1343,7 @@ def update_student(studentId):
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
 
 
 if __name__ == '__main__':
