@@ -871,99 +871,129 @@ def add_condition(organ, part):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 @app.route('/submit_form/<organ>/<part>', methods=['POST'])
 def submit_form(organ, part):
     try:
-        # Standardize part naming (convert 'ear' to 'pinna' if needed)
-        normalized_part = 'pinna' if part.lower() == 'ear' else part.lower()
+        # Standardize part naming
+        base_part = 'pinna' if part.lower() == 'ear' else part
 
-        # Validate organ and part
-        if not validate_organ(organ):
+        # Validate organ exists
+        if organ not in organs_structure:
             return jsonify({"error": f"Invalid organ: {organ}"}), 400
 
-        if normalized_part not in organs_structure.get(organ, {}).get("parts", []):
+        organ_parts = organs_structure[organ]["parts"]
+        matched_part = next((p for p in organ_parts if p.lower() == base_part.lower()), None)
+
+        if matched_part is None:
             return jsonify({"error": f"Invalid part: {part}"}), 400
 
         data = request.json
-        if not data:
+        if data is None:
             return jsonify({"error": "No input data provided"}), 400
 
         student_id = data.get('studentId')
-        if not student_id:
+        if student_id is None:
             return jsonify({"error": "Student ID is required"}), 400
 
-            # Check for existing submission
-        existing_form = organs_collection.find_one({
+            # Check if part was already submitted
+        existing_part_submission = organs_collection.find_one({
             "studentId": student_id,
             "organ": organ,
-            f"inputfields.{normalized_part}": {"$exists": True}
+            f"inputfields.{matched_part}": {"$exists": True}
         })
-        if existing_form:
-            return jsonify({"error": f"Already submitted {normalized_part} for {organ}"}), 400
+        if existing_part_submission:
+            return jsonify({"error": f"Already submitted {matched_part} for {organ}"}), 400
 
             # Verify DB connections
         if Student_collection is None or organs_collection is None:
-
             return jsonify({"error": "Database connection failed"}), 500
 
             # Get student info
         student = Student_collection.find_one({"studentId": student_id})
-        if not student:
+        if student is None:
             return jsonify({"error": "Student not found"}), 404
 
         timestamp = datetime.now()
 
-        # Build the document structure
-        organ_data = {
-            "organ": organ,
+        # Check if organ document exists for this student
+        existing_organ = organs_collection.find_one({
             "studentId": student_id,
-            "studentName": student.get('name'),
-            "status": "pending",
-            "timestamp": timestamp,
-            "inputfields": {
-                normalized_part: {
-                    "text": data.get(normalized_part, ''),
-                    "image_url": None,
-                    "submitted_at": timestamp
-                }
+            "organ": organ
+        })
+
+        # Prepare the update data
+        update_data = {
+            f"inputfields.{matched_part}": {
+                "text": data.get(matched_part, ''),
+                "image_url": None,
+                "submitted_at": timestamp
             },
-            "conditions": {}  # Initialize empty conditions
+            "last_updated": timestamp
         }
 
         # Handle image upload
-        image_field = f"{normalized_part}Image"
+        image_field = f"{matched_part}Image"
         if data.get(image_field):
             if not is_valid_base64(data[image_field]):
                 return jsonify({"error": "Invalid image data"}), 400
 
             public_url = upload_base64_to_s3(
                 data[image_field],
-                f"{organ}_{normalized_part}_{student_id}.jpg"
+                f"{organ}_{matched_part}_{student_id}.jpg"
             )
-            organ_data["inputfields"][normalized_part]["image_url"] = public_url
+            update_data[f"inputfields.{matched_part}.image_url"] = public_url
 
-            # Add conditions if they exist
+            # Handle conditions if they exist
         if student_id in temporary_conditions:
             organ_conditions = temporary_conditions[student_id].get(organ, {})
-            if normalized_part in organ_conditions:
-                organ_data["conditions"][normalized_part] = organ_conditions[normalized_part]
-            del temporary_conditions[student_id]
+            if matched_part in organ_conditions:
+                update_data[f"conditions.{matched_part}"] = organ_conditions[matched_part]
+                # Clean up temporary conditions
+                del temporary_conditions[student_id][organ][matched_part]
+                if not temporary_conditions[student_id][organ]:
+                    del temporary_conditions[student_id][organ]
+                if not temporary_conditions[student_id]:
+                    del temporary_conditions[student_id]
 
-            # Insert into database
-        result = organs_collection.insert_one(organ_data)
+                    # Update or create the organ document
+        if existing_organ:
+            result = organs_collection.update_one(
+                {"_id": existing_organ["_id"]},
+                {"$set": update_data}
+            )
+            document_id = existing_organ["_id"]
+        else:
+            organ_data = {
+                "organ": organ,
+                "studentId": student_id,
+                "studentName": student.get('name'),
+                "status": "pending",
+                "timestamp": timestamp,
+                "inputfields": {
+                    matched_part: update_data[f"inputfields.{matched_part}"]
+                },
+                "conditions": {},
+                "last_updated": timestamp
+            }
+            if f"conditions.{matched_part}" in update_data:
+                organ_data["conditions"][matched_part] = update_data[f"conditions.{matched_part}"]
+            result = organs_collection.insert_one(organ_data)
+            document_id = result.inserted_id
 
         return jsonify({
-            "message": f"{normalized_part} submitted successfully",
+            "message": f"{matched_part} submitted successfully",
             "document": {
-                "id": str(result.inserted_id),
+                "id": str(document_id),
                 "organ": organ,
-                "part": normalized_part
+                "part": matched_part,
+                "isNewDocument": existing_organ is None
             }
         }), 201
 
     except Exception as e:
+        # Log the exception here if necessary
         return jsonify({"error": str(e)}), 500
-
 
 @app.route('/get_unapproved_forms/<organ>', methods=['GET'])
 def get_forms_by_doctor(organ):
