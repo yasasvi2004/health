@@ -800,16 +800,24 @@ temporary_conditions = {}
 @app.route('/add_condition/<organ>/<part>', methods=['POST'])
 def add_condition(organ, part):
     try:
-        # Normalize part name
-        normalized_part = 'pinna' if part.lower() == 'ear' else part.lower()
+        # Normalize part name (special case for 'ear' → 'pinna')
+        normalized_part = 'pinna' if part.lower() == 'ear' else part
 
         # Validate organ
         if not validate_organ(organ):
             return jsonify({"error": f"Invalid organ: {organ}"}), 400
 
-        # Validate part
-        if normalized_part not in organs_structure.get(organ, {}).get("parts", []):
+        # Get all parts for the organ and prepare for case-insensitive comparison
+        organ_parts = organs_structure.get(organ, {}).get("parts", [])
+        lower_parts = [p.lower() for p in organ_parts]
+
+        # Check if part exists (case-insensitive)
+        if normalized_part.lower() not in lower_parts:
             return jsonify({"error": f"Invalid part: {part}"}), 400
+
+        # Get the correctly cased version from the original list
+        part_index = lower_parts.index(normalized_part.lower())
+        correct_cased_part = organ_parts[part_index]
 
         # Retrieve request data
         data = request.json
@@ -817,7 +825,7 @@ def add_condition(organ, part):
             return jsonify({"error": "No conditions provided"}), 400
 
         # Process each condition
-        student_id = None  # to get the studentId from the conditions
+        student_id = None
         for condition in data['conditions']:
             if not student_id:
                 student_id = condition.get('studentId')
@@ -829,8 +837,8 @@ def add_condition(organ, part):
                 temporary_conditions[student_id] = {}
             if organ not in temporary_conditions[student_id]:
                 temporary_conditions[student_id][organ] = {}
-            if normalized_part not in temporary_conditions[student_id][organ]:
-                temporary_conditions[student_id][organ][normalized_part] = []
+            if correct_cased_part not in temporary_conditions[student_id][organ]:
+                temporary_conditions[student_id][organ][correct_cased_part] = []
 
             # Prepare condition data
             condition_data = {
@@ -852,17 +860,16 @@ def add_condition(organ, part):
             if not condition_data["clinicalCondition"]:
                 return jsonify({"error": "clinicalCondition is required"}), 400
 
-            temporary_conditions[student_id][organ][normalized_part].append(condition_data)
+            temporary_conditions[student_id][organ][correct_cased_part].append(condition_data)
 
         return jsonify({
             "message": "Conditions added",
-            "part": normalized_part,
-            "conditionCount": len(temporary_conditions[student_id][organ][normalized_part])
+            "part": correct_cased_part,
+            "conditionCount": len(temporary_conditions[student_id][organ][correct_cased_part])
         }), 201
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 @app.route('/submit_form/<organ>/<part>', methods=['POST'])
 def submit_form(organ, part):
