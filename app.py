@@ -803,53 +803,59 @@ def add_condition(organ, part):
         # Normalize part name
         normalized_part = 'pinna' if part.lower() == 'ear' else part.lower()
 
-        # Validate
+        # Validate organ
         if not validate_organ(organ):
             return jsonify({"error": f"Invalid organ: {organ}"}), 400
 
+        # Validate part
         if normalized_part not in organs_structure.get(organ, {}).get("parts", []):
             return jsonify({"error": f"Invalid part: {part}"}), 400
 
+        # Retrieve request data
         data = request.json
-        if not data:
-            return jsonify({"error": "No data provided"}), 400
+        if not data or 'conditions' not in data:
+            return jsonify({"error": "No conditions provided"}), 400
 
-        student_id = data.get('studentId')
-        if not student_id:
-            return jsonify({"error": "Student ID required"}), 400
+        # Process each condition
+        student_id = None  # to get the studentId from the conditions
+        for condition in data['conditions']:
+            if not student_id:
+                student_id = condition.get('studentId')
+                if not student_id:
+                    return jsonify({"error": "Student ID required"}), 400
 
-        # Initialize storage
-        if student_id not in temporary_conditions:
-            temporary_conditions[student_id] = {}
-        if organ not in temporary_conditions[student_id]:
-            temporary_conditions[student_id][organ] = {}
-        if normalized_part not in temporary_conditions[student_id][organ]:
-            temporary_conditions[student_id][organ][normalized_part] = []
+            # Initialize storage
+            if student_id not in temporary_conditions:
+                temporary_conditions[student_id] = {}
+            if organ not in temporary_conditions[student_id]:
+                temporary_conditions[student_id][organ] = {}
+            if normalized_part not in temporary_conditions[student_id][organ]:
+                temporary_conditions[student_id][organ][normalized_part] = []
 
-        # Process conditions
-        condition_data = {
-            "clinicalCondition": data.get('clinicalCondition'),
-            "symptoms": data.get('symptoms'),
-            "signs": data.get('signs'),
-            "clinicalObservations": data.get('clinicalObservations'),
-            "bloodTests": data.get('bloodTests', ''),
-            "urineTests": data.get('urineTests', ''),
-            "heartRate": data.get('heartRate', ''),
-            "bloodPressure": data.get('bloodPressure', ''),
-            "xRays": data.get('xRays', ''),
-            "mriScans": data.get('mriScans', ''),
-            "added_at": datetime.now(),
-            "added_by": data.get('doctorId')
-        }
+            # Prepare condition data
+            condition_data = {
+                "clinicalCondition": condition.get('clinicalCondition'),
+                "symptoms": condition.get('symptoms', ''),
+                "signs": condition.get('signs', ''),
+                "clinicalObservations": condition.get('clinicalObservations', ''),
+                "bloodTests": condition.get('bloodTests', ''),
+                "urineTests": condition.get('urineTests', ''),
+                "heartRate": condition.get('heartRate', ''),
+                "bloodPressure": condition.get('bloodPressure', ''),
+                "xRays": condition.get('xRays', ''),
+                "mriScans": condition.get('mriScans', ''),
+                "added_at": datetime.now(),
+                "added_by": condition.get('doctorId')
+            }
 
-        # Validate required fields
-        if not condition_data["clinicalCondition"]:
-            return jsonify({"error": "clinicalCondition is required"}), 400
+            # Validate required fields
+            if not condition_data["clinicalCondition"]:
+                return jsonify({"error": "clinicalCondition is required"}), 400
 
-        temporary_conditions[student_id][organ][normalized_part].append(condition_data)
+            temporary_conditions[student_id][organ][normalized_part].append(condition_data)
 
         return jsonify({
-            "message": "Condition added",
+            "message": "Conditions added",
             "part": normalized_part,
             "conditionCount": len(temporary_conditions[student_id][organ][normalized_part])
         }), 201
