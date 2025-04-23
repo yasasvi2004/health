@@ -706,8 +706,7 @@ def validate_organ(organ):
         return False
     return True
 
-# Temporary conditions storage
-temporary_conditions = {}
+
 
 
 
@@ -800,8 +799,8 @@ temporary_conditions = {}
 @app.route('/add_condition/<organ>/<part>', methods=['POST'])
 def add_condition(organ, part):
     try:
-        # Normalize part name (special case for 'ear' → 'pinna')
-        normalized_part = 'pinna' if part.lower() == 'ear' else part
+
+        normalized_part = part
 
         # Validate organ
         if not validate_organ(organ):
