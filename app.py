@@ -707,55 +707,76 @@ def validate_organ(organ):
     return True
 
 
-
-
-
-@app.route('/get_clinical_conditions/<organ>', methods=['GET'])
-def get_clinical_conditions_by_organ(organ):
+@app.route('/get_clinical_conditions/<organ>/<part>', methods=['GET'])
+def get_clinical_conditions_by_organ_and_part(organ, part):
     try:
         # Validate organ name
         if not validate_organ(organ):
             return jsonify({"error": f"Invalid organ: {organ}"}), 400
 
-        # Fetch all forms for the specified organ
-        forms = organs_collection.find({"organ": organ})
+        # Get all valid parts for this organ (case-insensitive check)
+        organ_parts = organs_structure.get(organ, {}).get("parts", [])
+        part_lower = part.lower()
+        matched_part = next((p for p in organ_parts if p.lower() == part_lower), None)
 
-        # Prepare the response data
+        if not matched_part:
+            return jsonify({"error": f"Invalid part '{part}' for organ '{organ}'"}), 400
+
+        # Fetch forms that have conditions for this specific organ and part
+        forms = organs_collection.find({
+            "organ": organ,
+            f"conditions.{matched_part}": {"$exists": True, "$ne": []}
+        })
+
         clinical_conditions = []
         for form in forms:
-            if "conditions" in form and form["conditions"]:  # Check if conditions exist and are not empty
-                # Fetch student details
-                student = Student_collection.find_one({"studentId": form["studentId"]})
-                if not student:
-                    continue  # Skip if student not found
+            # Get conditions for the specific part
+            part_conditions = form["conditions"].get(matched_part, [])
 
-                # Iterate through each part and its conditions
-                for part, conditions in form["conditions"].items():
-                    # Remove null fields and empty conditions
-                    cleaned_conditions = []
-                    for condition in conditions:
-                        if condition:  # Check if the condition is not empty
-                            cleaned_condition = {k: v for k, v in condition.items() if v is not None}
-                            if cleaned_condition:  # Ensure the cleaned condition is not empty
-                                cleaned_condition["subpart"] = part  # Add subpart name inside the condition
-                                cleaned_conditions.append(cleaned_condition)
+            if not part_conditions:
+                continue
 
-                    # Only include parts with non-empty conditions
-                    if cleaned_conditions:
-                        clinical_conditions.append({
-                            "studentId": student["studentId"],
-                            "studentName": student["studentname"],
-                            "part": part,
-                            "noOfConditions": len(cleaned_conditions),
-                            "conditions": {
-                                f"record{i + 1}": condition for i, condition in enumerate(cleaned_conditions)
-                            }
-                        })
+            # Fetch student details
+            student = Student_collection.find_one({"studentId": form["studentId"]})
+            if not student:
+                continue
 
-        return jsonify(clinical_conditions), 200
+            # Clean conditions (remove null/empty fields)
+            cleaned_conditions = []
+            for condition in part_conditions:
+                if condition:
+                    cleaned_condition = {k: v for k, v in condition.items() if v is not None}
+                    if cleaned_condition:
+                        cleaned_condition["subpart"] = matched_part
+                        cleaned_conditions.append(cleaned_condition)
+
+            if cleaned_conditions:
+                clinical_conditions.append({
+                    "studentId": student["studentId"],
+                    "studentName": student["studentname"],
+                    "part": matched_part,
+                    "organ": organ,
+                    "noOfConditions": len(cleaned_conditions),
+                    "conditions": {
+                        f"record{i + 1}": cond for i, cond in enumerate(cleaned_conditions)
+                    },
+                    "submissionDate": form.get("timestamp"),
+                    "status": form.get("status", "pending")
+                })
+
+        return jsonify({
+            "organ": organ,
+            "part": matched_part,
+            "totalConditions": sum(len(item["conditions"]) for item in clinical_conditions),
+            "clinicalConditions": clinical_conditions
+        }), 200
 
     except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return jsonify({
+            "error": f"An error occurred: {str(e)}",
+            "organ": organ,
+            "part": part
+        }), 500
 
 
 def is_valid_base64(data):
@@ -799,9 +820,7 @@ temporary_conditions = {}
 @app.route('/add_condition/<organ>/<part>', methods=['POST'])
 def add_condition(organ, part):
     try:
-
         normalized_part = part
-
         # Validate organ
         if not validate_organ(organ):
             return jsonify({"error": f"Invalid organ: {organ}"}), 400
@@ -926,8 +945,10 @@ def submit_form(organ, part):
             f"inputfields.{matched_part}": {
                 "text": data.get(matched_part, ''),
                 "image_url": None,
-                "submitted_at": timestamp
+                "submitted_at": timestamp,
+                "status": "pending"  # Add initial status
             },
+            "status": "pending",  # Set form status to pending
             "last_updated": timestamp
         }
 
@@ -994,45 +1015,60 @@ def submit_form(organ, part):
         # Log the exception here if necessary
         return jsonify({"error": str(e)}), 500
 
+
 @app.route('/get_unapproved_forms/<organ>', methods=['GET'])
-def get_forms_by_doctor(organ):
+def get_all_organ_forms(organ=None):
     try:
-        # Find forms based on both status and the specified organ name
-        forms = list(organs_collection.find({
-            "status": {"$in": ["pending", "approved", "rejected"]},
-            "organ": organ  # Filter by organ
-        }))
+        # Build the query - filter by organ if provided
+        query = {}
+        if organ:
+            # Validate the organ exists
+            if organ.lower() not in organs_structure:
+                return jsonify({"error": f"Invalid organ: {organ}"}), 400
+            query["organ"] = organ.lower()
 
-        # Gather all student IDs from the forms
-        student_ids = {form["studentId"] for form in forms}
+        # Optionally filter by status (e.g., pending)
+        status = request.args.get('status')
+        if status:
+            query["status"] = status.lower()
 
-        # Retrieve students based on the collected student IDs
-        students = {s["studentId"]: s for s in Student_collection.find({"studentId": {"$in": list(student_ids)}})}
+        # Fetch organ forms based on query
+        forms = list(organs_collection.find(query))
 
-        response_data = []
-
+        # Prepare the response data
+        forms_list = []
         for form in forms:
-            student = students.get(form["studentId"])
+            # Get student details
+            student = Student_collection.find_one({"studentId": form["studentId"]})
             if not student:
                 continue
-                # Create card data for the response
-            card_data = {
-                "studentId": student["studentId"],
+
+            forms_list.append({
+                "_id": str(form["_id"]),  # Convert ObjectId to string
+                "organ": form["organ"],
+                "studentId": form["studentId"],
                 "studentName": student["studentname"],
-                "doctorId": student["doctorId"],
-                "doctorName": student["doctorname"],
-                "formId": str(form["_id"]),
-                "timestamp": form.get("timestamp"),
-                "approved_timestamp": form.get("approved_timestamp"),
-                "rejected_timestamp": form.get("rejected_timestamp"),
-                "status": form.get("status"),
-                "organ": form.get("organ")
-            }
-            response_data.append(card_data)
-        return jsonify(response_data), 200
+                "status": form.get("status", "pending"),
+                "submissionDate": form.get("timestamp"),
+                "lastUpdated": form.get("last_updated"),
+                "doctorId": student.get("doctorId"),
+                "doctorName": student.get("doctorname"),
+                "partsSubmitted": list(form.get("inputfields", {}).keys())
+            })
+
+        return jsonify({
+            "count": len(forms_list),
+            "organ": organ if organ else "all",
+            "forms": forms_list
+        }), 200
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+
+
+
 
 
 @app.route('/get_all_pending_forms', methods=['GET'])
@@ -1077,114 +1113,115 @@ def get_all_pending_forms():
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-@app.route('/fetch_form_details/<form_id>', methods=['GET'])
-def fetch_form_details(form_id):
+@app.route('/fetch_form_details/<organ>/<student_id>/<part>', methods=['GET'])
+def fetch_form_details(organ, student_id, part):
     try:
-        # Convert form_id to ObjectId
-        form_object_id = ObjectId(form_id)
+        # Validate organ
+        if not validate_organ(organ):
+            return jsonify({"error": f"Invalid organ: {organ}"}), 400
 
-        # Fetch the form details from the Organs collection
-        form = organs_collection.find_one({"_id": form_object_id})
+        # Find the student's organ submission
+        form = organs_collection.find_one({
+            "organ": organ,
+            "studentId": student_id
+        })
+
         if not form:
             return jsonify({"error": "Form not found"}), 404
 
-        # Convert ObjectId to string for JSON serialization
-        form["_id"] = str(form["_id"])
+        # Check if the requested part exists
+        inputfields = form.get("inputfields", {})
+        if part not in inputfields:
+            return jsonify({"error": f"Part '{part}' not found in submission"}), 404
 
-        # Include approval/rejection timestamps in the response
-        response_data = {
-            **form,
-            "approved_timestamp": form.get("approved_timestamp"),
-            "rejected_timestamp": form.get("rejected_timestamp")
+        # Prepare the response
+        response = {
+            "studentId": student_id,
+            "organ": organ,
+            "part": part,
+            "partDetails": inputfields[part],
+            "formStatus": form.get("status", "pending"),
+            "submissionDate": form.get("timestamp"),
+            "allPartsStatus": {
+                p: data.get("status", "pending")
+                for p, data in inputfields.items()
+            }
         }
 
-        return jsonify(response_data), 200
+        # Add student details if needed
+        student = Student_collection.find_one({"studentId": student_id})
+        if student:
+            response["studentName"] = student.get("studentname")
+            response["college"] = student.get("college")
+
+        return jsonify(response), 200
 
     except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return jsonify({
+            "error": str(e),
+            "organ": organ,
+            "studentId": student_id,
+            "part": part
+        }), 500
 
 
-@app.route('/reject_form/<form_id>', methods=['POST'])
-def reject_form(form_id):
+@app.route('/review_part/<student_id>/<organ>/<part_name>', methods=['POST'])
+def review_part(student_id, organ, part_name):
     try:
-        # Convert form_id to ObjectId
-        form_object_id = ObjectId(form_id)
-
-        # Check if the form exists
-        existing_form = organs_collection.find_one({"_id": form_object_id})
-        if not existing_form:
-            return jsonify({"error": "Form not found"}), 404
-
-        # Update the form status to "rejected" and add rejection timestamp
-        result = organs_collection.update_one(
-            {"_id": form_object_id},
-            {"$set": {"status": "rejected", "rejected_timestamp": datetime.now()}}
-        )
-
-        # Log the updated form for debugging
-        updated_form = organs_collection.find_one({"_id": form_object_id})
-        print(f"Updated Form (Rejected): {updated_form}")
-
-        if result.modified_count == 1:
-            return jsonify({"message": "Form rejected successfully"}), 200
-        else:
-            return jsonify({"error": "Form not found or already rejected"}), 404
-
-    except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
-
-@app.route('/approve_form/<form_id>', methods=['POST'])
-def approve_form(form_id):
-    try:
-        # Get request data
         data = request.json
-        print(f"Request Data: {data}")
-        if not data:
-            return jsonify({"error": "No input data provided"}), 400
+        action = data.get('action')  # 'approve' or 'reject'
+        feedback = data.get('feedback', '')
+        reviewed_by = data.get('reviewed_by')  # doctorId
 
-        # Convert form_id to ObjectId
-        form_object_id = ObjectId(form_id)
+        if action not in ['approve', 'reject']:
+            return jsonify({"error": "Invalid action"}), 400
 
-        # Fetch the existing form from the database
-        existing_form = organs_collection.find_one({"_id": form_object_id})
-        print(f"Existing Form: {existing_form}")
-
-        if not existing_form:
-            return jsonify({"error": "Form not found"}), 404
-
-        # Prepare the updated form data
-        updated_form_data = {
-            "status": "approved",  # Update status to "approved"
-            "approved_timestamp": datetime.now()  # Add approval timestamp
+        # Update the specific part inside the organ document
+        update_data = {
+            f"inputfields.{part_name}.status": "approved" if action == "approve" else "rejected",
+            f"inputfields.{part_name}.reviewed_at": datetime.now(),
+            f"inputfields.{part_name}.reviewed_by": reviewed_by,
+            f"inputfields.{part_name}.feedback": feedback,
+            "last_updated": datetime.now()
         }
 
-        # Update inputfields if provided
-        if "inputfields" in data:
-            updated_form_data["inputfields"] = data["inputfields"]
-
-        # Update conditions if provided
-        if "conditions" in data:
-            updated_form_data["conditions"] = data["conditions"]
-
-        # Update the form in the database
+        # Find the student's organ submission and update the part
         result = organs_collection.update_one(
-            {"_id": form_object_id},
-            {"$set": updated_form_data}
+            {
+                "studentId": student_id,
+                "organ": organ
+            },
+            {"$set": update_data}
         )
 
-        # Log the updated form for debugging
-        updated_form = organs_collection.find_one({"_id": form_object_id})
-        print(f"Updated Form (Approved): {updated_form}")
+        if result.modified_count == 0:
+            return jsonify({"error": "Part not found or no changes made"}), 404
 
-        if result.modified_count == 1:
-            return jsonify({"message": "Form approved and updated successfully"}), 200
-        else:
-            return jsonify({"error": "Form not found or no changes made"}), 404
+        # Check if all parts are now reviewed
+        form = organs_collection.find_one({
+            "studentId": student_id,
+            "organ": organ
+        })
+
+        all_reviewed = all(
+            part.get('status') in ['approved', 'rejected']
+            for part in form['inputfields'].values()
+        )
+
+        # Update overall form status if all parts are reviewed
+        if all_reviewed:
+            organs_collection.update_one(
+                {"studentId": student_id, "organ": organ},
+                {"$set": {"status": "reviewed"}}
+            )
+
+        return jsonify({
+            "message": f"Part {part_name} {action}d successfully",
+            "form_status": "reviewed" if all_reviewed else "pending"
+        }), 200
 
     except Exception as e:
-        print(f"Error: {str(e)}")
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/get_all_doctors', methods=['GET'])
