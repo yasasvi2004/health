@@ -940,7 +940,8 @@ def submit_form(organ, part):
             "organ": organ
         })
 
-        # Prepare the update data
+
+            # Prepare the update data
         update_data = {
             f"inputfields.{matched_part}": {
                 "text": data.get(matched_part, ''),
@@ -987,7 +988,7 @@ def submit_form(organ, part):
             organ_data = {
                 "organ": organ,
                 "studentId": student_id,
-                "studentName": student.get('name'),
+                "studentName": student.get('studentname'),
                 "status": "pending",
                 "timestamp": timestamp,
                 "inputfields": {
