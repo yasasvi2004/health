@@ -1049,7 +1049,7 @@ def review_condition(student_id, organ, part_name, condition_index):
         reviewed_by = data.get('reviewed_by')  # Optional doctorId
 
         # Validate action
-        if action not in ['approved', 'rejected', 'review']:
+        if action not in ['approve', 'reject', 'review']:
             return jsonify({"error": "Invalid action. Must be 'approve', 'reject', or 'review'."}), 400
 
         # Find and validate the organ document
@@ -1066,9 +1066,11 @@ def review_condition(student_id, organ, part_name, condition_index):
         if condition_index >= len(part_conditions):
             return jsonify({"error": "Condition index out of range"}), 400
 
+        new_status = 'approved' if action == 'approve' else 'rejected' if action == 'reject' else 'reviewed' if action =='review' else None
+
         # Prepare the update
         update_data = {
-            f"inputfields.{part_name}.conditions.{condition_index}.status": action,
+            f"inputfields.{part_name}.conditions.{condition_index}.status": new_status,
             f"inputfields.{part_name}.conditions.{condition_index}.reviewed_at": datetime.utcnow(),
             "last_updated": datetime.utcnow()
         }
@@ -1119,7 +1121,7 @@ def review_part(student_id, organ, part_name):
         feedback = data.get('feedback')  # Optional
         reviewed_by = data.get('reviewed_by')
 
-        if action not in ['approved', 'rejected','review']:
+        if action not in ['approve', 'reject','review']:
             return jsonify({"error": "Invalid action. Must be 'approve' or 'reject'."}), 400
 
 
@@ -1143,10 +1145,10 @@ def review_part(student_id, organ, part_name):
                     if cond.get('status') not in ['approved', 'rejected']
                 ]
             }), 400
-
+        new_status = 'approved' if action == 'approve' else 'rejected' if action == 'reject' else 'review' if action == 'reviewed' else None
         # Prepare the update
         update_data = {
-            f"inputfields.{part_name}.status": action,
+            f"inputfields.{part_name}.status": new_status,
             f"inputfields.{part_name}.reviewed_at": datetime.utcnow(),
             f"inputfields.{part_name}.reviewed_by": reviewed_by,
             "last_updated": datetime.utcnow()
