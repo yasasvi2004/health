@@ -1039,71 +1039,6 @@ def fetch_form_details(organ, student_id, part):
             "part": part
         }), 500
 
-@app.route('/review_part/<student_id>/<organ>/<part_name>', methods=['POST'])
-def review_part(student_id, organ, part_name):
-    try:
-        data = request.json
-        action = data.get('action')  # 'approve', 'reject', or 'review'
-        feedback = data.get('feedback', '')  # Optional
-        reviewed_by = data.get('reviewed_by')  # doctorId (required)
-
-        if action not in ['approved', 'rejected', 'review']:
-            return jsonify({"error": "Invalid action. Must be 'approve', 'reject', or 'review'."}), 400
-
-
-        # Prepare the update for the specific part
-        update_data = {
-            f"inputfields.{part_name}.status": action,  # Now directly set to approve/reject/review
-            f"inputfields.{part_name}.reviewed_at": datetime.utcnow(),
-            f"inputfields.{part_name}.reviewed_by": reviewed_by,
-            f"inputfields.{part_name}.feedback": feedback,
-            "last_updated": datetime.utcnow()
-        }
-
-        # Update the student's organ submission
-        result = organs_collection.update_one(
-            {
-                "studentId": student_id,
-                "organ": organ
-            },
-            {"$set": update_data}
-        )
-
-        if result.matched_count == 0:
-            return jsonify({"error": "Student organ record not found."}), 404
-        if result.modified_count == 0:
-            return jsonify({"error": "No changes made, possibly wrong part_name."}), 400
-
-        # Fetch the updated form
-        form = organs_collection.find_one({
-            "studentId": student_id,
-            "organ": organ
-        })
-
-        if not form or 'inputfields' not in form:
-            return jsonify({"error": "Organ submission structure invalid."}), 500
-
-        # Check if all parts are reviewed or if any is still in review
-        part_statuses = [part.get('status') for part in form['inputfields'].values()]
-
-        if all(status in ['approved', 'rejected'] for status in part_statuses):
-            # If all parts are approved or rejected, update form status to "reviewed"
-            organs_collection.update_one(
-                {"studentId": student_id, "organ": organ},
-                {"$set": {"status": "reviewed"}}
-            )
-            form_status = "reviewed"
-        else:
-            form_status = "pending"
-
-        return jsonify({
-            "message": f"Part '{part_name}' marked as {action} successfully.",
-            "form_status": form_status
-        }), 200
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 
 @app.route('/review_condition/<student_id>/<organ>/<part_name>/<int:condition_index>', methods=['POST'])
 def review_condition(student_id, organ, part_name, condition_index):
@@ -1166,24 +1101,93 @@ def review_condition(student_id, organ, part_name, condition_index):
                 {"$set": {f"inputfields.{part_name}.status": "reviewed"}}
             )
 
-        # Check if all parts in the organ are reviewed
-        part_statuses = [part.get('status') for part in form['inputfields'].values()]
-        form_status = "reviewed" if all(status == 'reviewed' for status in part_statuses) else "pending"
-
-        if form_status == "reviewed":
-            organs_collection.update_one(
-                {"studentId": student_id, "organ": organ},
-                {"$set": {"status": "reviewed"}}
-            )
-
         return jsonify({
             "message": f"Condition {condition_index} for part '{part_name}' marked as {action} successfully.",
-            "form_status": form_status
+            "part_status": "reviewed" if all(
+                cond.get('status') in ['approved', 'rejected'] for cond in part_conditions) else "pending"
         }), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/review_part/<student_id>/<organ>/<part_name>', methods=['POST'])
+def review_part(student_id, organ, part_name):
+    try:
+        data = request.json
+        action = data.get('action')  # 'approve' or 'reject'
+        feedback = data.get('feedback')  # Optional
+        reviewed_by = data.get('reviewed_by')
+
+        if action not in ['approved', 'rejected','review']:
+            return jsonify({"error": "Invalid action. Must be 'approve' or 'reject'."}), 400
+
+
+
+        # Find and validate the organ document
+        organ_document = organs_collection.find_one({"studentId": student_id, "organ": organ})
+        if not organ_document:
+            return jsonify({"error": "Organ not found for student"}), 404
+
+        # Validate the part exists
+        if part_name not in organ_document.get('inputfields', {}):
+            return jsonify({"error": f"Part {part_name} not found in inputfields"}), 404
+
+        # Check if all conditions are already approved/rejected
+        part_conditions = organ_document['inputfields'][part_name].get('conditions', [])
+        if not all(cond.get('status') in ['approved', 'rejected'] for cond in part_conditions):
+            return jsonify({
+                "error": "Cannot approve/reject part until all conditions are approved or rejected",
+                "unresolved_conditions": [
+                    i for i, cond in enumerate(part_conditions)
+                    if cond.get('status') not in ['approved', 'rejected']
+                ]
+            }), 400
+
+        # Prepare the update
+        update_data = {
+            f"inputfields.{part_name}.status": action,
+            f"inputfields.{part_name}.reviewed_at": datetime.utcnow(),
+            f"inputfields.{part_name}.reviewed_by": reviewed_by,
+            "last_updated": datetime.utcnow()
+        }
+
+        if feedback is not None:
+            update_data[f"inputfields.{part_name}.feedback"] = feedback
+
+        # Perform the update
+        result = organs_collection.update_one(
+            {"studentId": student_id, "organ": organ},
+            {"$set": update_data}
+        )
+
+        if result.matched_count == 0:
+            return jsonify({"error": "Student organ record not found."}), 404
+        if result.modified_count == 0:
+            return jsonify({"error": "No changes made, possibly wrong part_name."}), 400
+
+        # Check if all parts are reviewed (approved/rejected)
+        form = organs_collection.find_one({"studentId": student_id, "organ": organ})
+        part_statuses = [part.get('status') for part in form['inputfields'].values()]
+
+        if all(status in ['approved', 'rejected'] for status in part_statuses):
+            # Update form status to "reviewed" if all parts are approved/rejected
+            organs_collection.update_one(
+                {"studentId": student_id, "organ": organ},
+                {"$set": {"status": "reviewed"}}
+            )
+            form_status = "reviewed"
+        else:
+            form_status = "pending"
+
+        return jsonify({
+            "message": f"Part '{part_name}' marked as {action} successfully.",
+            "form_status": form_status,
+            "part_status": action
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 
