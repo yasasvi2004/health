@@ -909,6 +909,8 @@ def submit_form(organ, part):
         data = request.json
         if data is None:
             return jsonify({"error": "No input data provided"}), 400
+        if data is None:
+            return jsonify({"error": "No input data provided"})
 
         student_id = data.get('studentId')
         if student_id is None:
@@ -1067,11 +1069,6 @@ def get_all_organ_forms(organ=None):
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-
-
-
-
-
 @app.route('/get_all_pending_forms', methods=['GET'])
 def get_all_pending_forms():
     try:
@@ -1170,23 +1167,24 @@ def fetch_form_details(organ, student_id, part):
 def review_part(student_id, organ, part_name):
     try:
         data = request.json
-        action = data.get('action')  # 'approve' or 'reject'
-        feedback = data.get('feedback', '')
-        reviewed_by = data.get('reviewed_by')  # doctorId
+        action = data.get('action')  # 'approve', 'reject', or 'review'
+        feedback = data.get('feedback', '')  # Optional
+        reviewed_by = data.get('reviewed_by')  # doctorId (required)
 
-        if action not in ['approve', 'reject']:
-            return jsonify({"error": "Invalid action"}), 400
+        if action not in ['approve', 'reject', 'review']:
+            return jsonify({"error": "Invalid action. Must be 'approve', 'reject', or 'review'."}), 400
 
-        # Update the specific part inside the organ document
+
+        # Prepare the update for the specific part
         update_data = {
-            f"inputfields.{part_name}.status": "approved" if action == "approve" else "rejected",
-            f"inputfields.{part_name}.reviewed_at": datetime.now(),
+            f"inputfields.{part_name}.status": action,  # Now directly set to approve/reject/review
+            f"inputfields.{part_name}.reviewed_at": datetime.utcnow(),
             f"inputfields.{part_name}.reviewed_by": reviewed_by,
             f"inputfields.{part_name}.feedback": feedback,
-            "last_updated": datetime.now()
+            "last_updated": datetime.utcnow()
         }
 
-        # Find the student's organ submission and update the part
+        # Update the student's organ submission
         result = organs_collection.update_one(
             {
                 "studentId": student_id,
@@ -1195,30 +1193,36 @@ def review_part(student_id, organ, part_name):
             {"$set": update_data}
         )
 
+        if result.matched_count == 0:
+            return jsonify({"error": "Student organ record not found."}), 404
         if result.modified_count == 0:
-            return jsonify({"error": "Part not found or no changes made"}), 404
+            return jsonify({"error": "No changes made, possibly wrong part_name."}), 400
 
-        # Check if all parts are now reviewed
+        # Fetch the updated form
         form = organs_collection.find_one({
             "studentId": student_id,
             "organ": organ
         })
 
-        all_reviewed = all(
-            part.get('status') in ['approved', 'rejected']
-            for part in form['inputfields'].values()
-        )
+        if not form or 'inputfields' not in form:
+            return jsonify({"error": "Organ submission structure invalid."}), 500
 
-        # Update overall form status if all parts are reviewed
-        if all_reviewed:
+        # Check if all parts are reviewed or if any is still in review
+        part_statuses = [part.get('status') for part in form['inputfields'].values()]
+
+        if all(status in ['approved', 'rejected'] for status in part_statuses):
+            # If all parts are approved or rejected, update form status to "reviewed"
             organs_collection.update_one(
                 {"studentId": student_id, "organ": organ},
                 {"$set": {"status": "reviewed"}}
             )
+            form_status = "reviewed"
+        else:
+            form_status = "pending"
 
         return jsonify({
-            "message": f"Part {part_name} {action}d successfully",
-            "form_status": "reviewed" if all_reviewed else "pending"
+            "message": f"Part '{part_name}' marked as {action} successfully.",
+            "form_status": form_status
         }), 200
 
     except Exception as e:
