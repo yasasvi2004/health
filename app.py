@@ -1395,6 +1395,67 @@ def update_student(studentId):
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
+@app.route('/submit_conditions/<student_id>/<organ>/<part>', methods=['POST'])
+def submit_conditions(student_id, organ, part):
+    try:
+        # Normalize part name
+        normalized_part = part
+
+        # Validate organ
+        if not validate_organ(organ):
+            return jsonify({"error": f"Invalid organ: {organ}"}), 400
+
+        # Validate if student has temporary conditions
+        if student_id not in temporary_conditions:
+            return jsonify({"error": "No temporary conditions found for this student"}), 404
+        if organ not in temporary_conditions[student_id]:
+            return jsonify({"error": f"No temporary conditions found for organ: {organ}"}), 404
+
+        organ_parts = organs_structure.get(organ, {}).get("parts", [])
+        lower_parts = [p.lower() for p in organ_parts]
+
+        # Validate part
+        if normalized_part.lower() not in lower_parts:
+            return jsonify({"error": f"Invalid part: {part}"}), 400
+
+        part_index = lower_parts.index(normalized_part.lower())
+        correct_cased_part = organ_parts[part_index]
+
+        if correct_cased_part not in temporary_conditions[student_id][organ]:
+            return jsonify({"error": f"No temporary conditions for part: {correct_cased_part}"}), 404
+
+        # Fetch the conditions to submit
+        conditions_to_submit = temporary_conditions[student_id][organ][correct_cased_part]
+
+        # Update the corresponding organ document in your main collection
+        result = organs_collection.update_one(
+            {"studentId": student_id, "organ": organ},
+            {
+                "$push": {f"inputfields.{correct_cased_part}.conditions": {"$each": conditions_to_submit}},
+                "$set": {"last_updated": datetime.utcnow()}
+            }
+        )
+
+        if result.matched_count == 0:
+            return jsonify({"error": "Student organ record not found"}), 404
+
+        # After successful submission, clear temporary conditions
+        del temporary_conditions[student_id][organ][correct_cased_part]
+
+        # Clean up empty dictionaries
+        if not temporary_conditions[student_id][organ]:
+            del temporary_conditions[student_id][organ]
+        if not temporary_conditions[student_id]:
+            del temporary_conditions[student_id]
+
+        return jsonify({
+            "message": f"Conditions for part '{correct_cased_part}' submitted successfully.",
+            "submittedCount": len(conditions_to_submit)
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)
