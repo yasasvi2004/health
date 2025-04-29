@@ -1399,48 +1399,45 @@ def submit_form(organ, part):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+
+
+
 @app.route('/submit_conditions/<student_id>/<organ>/<part>', methods=['POST'])
 def submit_conditions(student_id, organ, part):
     try:
         # Normalize part name
-        normalized_part = part
+        normalized_part = part.lower()
 
-        # Validate organ
-        if not validate_organ(organ):
+        # Validate organ exists
+        if organ not in organs_structure:
             return jsonify({"error": f"Invalid organ: {organ}"}), 400
 
-        # Validate if the student exists
+            # Find correct case for part name
+        organ_parts = organs_structure[organ]["parts"]
+        matched_part = next((p for p in organ_parts if p.lower() == normalized_part), None)
+        if not matched_part:
+            return jsonify({"error": f"Invalid part: {part}"}), 400
+
+            # Validate student exists
         student = Student_collection.find_one({"studentId": student_id})
         if not student:
             return jsonify({"error": "Student not found"}), 404
 
-        # Check if organ and part exist in the structure
-        organ_parts = organs_structure.get(organ, {}).get("parts", [])
-        lower_parts = [p.lower() for p in organ_parts]
-
-        # Validate part
-        if normalized_part.lower() not in lower_parts:
-            return jsonify({"error": f"Invalid part: {part}"}), 400
-
-        part_index = lower_parts.index(normalized_part.lower())
-        correct_cased_part = organ_parts[part_index]
-
-        # Fetch the conditions from the request
+            # Validate request data
         data = request.json
-        conditions_to_submit = data.get('conditions', [])
-        if not conditions_to_submit:
-            return jsonify({"error": "Conditions data is required"}), 400
+        if not data or not isinstance(data.get('conditions', []), list):
+            return jsonify({"error": "Conditions data must be an array"}), 400
 
-        # Prepare conditions data for submission
         timestamp = datetime.utcnow()
         conditions_data = []
-        for condition in conditions_to_submit:
-            # Validate required fields for condition
+
+        for condition in data['conditions']:
             if not condition.get('clinicalCondition'):
                 return jsonify({"error": "clinicalCondition is required"}), 400
 
-            condition_data = {
-                "clinicalCondition": condition.get('clinicalCondition'),
+            conditions_data.append({
+                "clinicalCondition": condition['clinicalCondition'],
                 "symptoms": condition.get('symptoms', ''),
                 "signs": condition.get('signs', ''),
                 "clinicalObservations": condition.get('clinicalObservations', ''),
@@ -1452,40 +1449,40 @@ def submit_conditions(student_id, organ, part):
                 "mriScans": condition.get('mriScans', ''),
                 "added_at": timestamp,
                 "added_by": condition.get('doctorId'),
-                "status": "pending"  # Add initial status
-            }
-            conditions_data.append(condition_data)
+                "status": "pending"
+            })
 
-        # Check if organ document exists
-        existing_organ = organs_collection.find_one(
-            {"studentId": student_id, "organ": organ}
-        )
+            # Find existing document or prepare new one
+        existing_organ = organs_collection.find_one({"studentId": student_id, "organ": organ})
 
         if existing_organ:
-            # Document exists - update it
-            update_data = {
-                "$push": {f"inputfields.{correct_cased_part}.conditions": {"$each": conditions_data}},
+            # Check if part exists but isn't an object
+            if matched_part in existing_organ.get('inputfields', {}) and not isinstance(
+                    existing_organ['inputfields'][matched_part], dict):
+                return jsonify({
+                    "error": f"Invalid existing data structure for part '{matched_part}'",
+                    "solution": "Please contact admin to fix data consistency"
+                }), 400
+
+                # Prepare update operation
+            update = {
                 "$set": {
                     "last_updated": timestamp,
-                    "status": "pending",
-                    "studentName": student.get('studentname')  # Ensure student name is set
-                }
+                    "studentName": student.get('studentname')
+                },
+                "$push": {f"inputfields.{matched_part}.conditions": {"$each": conditions_data}}
             }
 
-            # If the part doesn't exist in inputfields yet, initialize it
-            if correct_cased_part not in existing_organ.get('inputfields', {}):
-                update_data["$set"][f"inputfields.{correct_cased_part}"] = {
+            # If part doesn't exist, initialize it
+            if matched_part not in existing_organ['inputfields']:
+                update["$set"][f"inputfields.{matched_part}"] = {
                     "status": "pending",
                     "conditions": conditions_data
                 }
-            else:
-                # If part exists but has no conditions array, initialize it
-                if 'conditions' not in existing_organ['inputfields'][correct_cased_part]:
-                    update_data["$set"][f"inputfields.{correct_cased_part}.conditions"] = conditions_data
 
             result = organs_collection.update_one(
                 {"_id": existing_organ["_id"]},
-                update_data
+                update
             )
         else:
             # Create new document
@@ -1494,9 +1491,8 @@ def submit_conditions(student_id, organ, part):
                 "studentId": student_id,
                 "studentName": student.get('studentname'),
                 "status": "pending",
-                "timestamp": timestamp,
                 "inputfields": {
-                    correct_cased_part: {
+                    matched_part: {
                         "status": "pending",
                         "conditions": conditions_data
                     }
@@ -1505,16 +1501,16 @@ def submit_conditions(student_id, organ, part):
             }
             result = organs_collection.insert_one(organ_data)
 
-        if result.matched_count == 0 and existing_organ:
-            return jsonify({"error": "Student organ record not found"}), 404
-
         return jsonify({
-            "message": f"Conditions for part '{correct_cased_part}' submitted successfully.",
-            "submittedCount": len(conditions_data)
+            "message": f"Conditions submitted successfully for {matched_part}",
+            "count": len(conditions_data)
         }), 200
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "error": str(e),
+            "debug": "Please check if the document structure is consistent"
+        }), 500
 
 
 
