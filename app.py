@@ -711,74 +711,73 @@ def validate_organ(organ):
 @app.route('/get_clinical_conditions/<organ>/<part>', methods=['GET'])
 def get_clinical_conditions_by_organ_and_part(organ, part):
     try:
-        # Validate organ name
-        if not validate_organ(organ):
+        # Validate organ exists in structure
+        if organ not in organs_structure:
             return jsonify({"error": f"Invalid organ: {organ}"}), 400
 
-        # Get all valid parts for this organ (case-insensitive check)
-        organ_parts = organs_structure.get(organ, {}).get("parts", [])
-        part_lower = part.lower()
-        matched_part = next((p for p in organ_parts if p.lower() == part_lower), None)
-
+        # Find correct case for part name
+        organ_parts = organs_structure[organ]["parts"]
+        matched_part = next((p for p in organ_parts if p.lower() == part.lower()), None)
         if not matched_part:
             return jsonify({"error": f"Invalid part '{part}' for organ '{organ}'"}), 400
 
-        # Fetch forms that have conditions for this specific organ and part
+        # Query for forms with conditions in this organ/part
         forms = organs_collection.find({
             "organ": organ,
-            f"conditions.{matched_part}": {"$exists": True, "$ne": []}
+            f"inputfields.{matched_part}.conditions": {"$exists": True, "$ne": []}
         })
 
         clinical_conditions = []
+
         for form in forms:
-            # Get conditions for the specific part
-            part_conditions = form["conditions"].get(matched_part, [])
+            # Get conditions for this specific part
+            part_data = form.get("inputfields", {}).get(matched_part, {})
+            part_conditions = part_data.get("conditions", [])
 
             if not part_conditions:
                 continue
 
-            # Fetch student details
+            # Get student details
             student = Student_collection.find_one({"studentId": form["studentId"]})
-            if not student:
-                continue
+            student_name = student.get("studentname") if student else "Unknown"
 
-            # Clean conditions (remove null/empty fields)
+            # Prepare cleaned conditions
             cleaned_conditions = []
-            for condition in part_conditions:
-                if condition:
-                    cleaned_condition = {k: v for k, v in condition.items() if v is not None}
-                    if cleaned_condition:
-                        cleaned_condition["subpart"] = matched_part
-                        cleaned_conditions.append(cleaned_condition)
+            for cond in part_conditions:
+                if cond and cond.get("clinicalCondition"):
+                    cleaned_cond = {
+                        k: v for k, v in cond.items()
+                        if v not in [None, ""] and k != "_id"
+                    }
+                    cleaned_conditions.append(cleaned_cond)
 
             if cleaned_conditions:
                 clinical_conditions.append({
-                    "studentId": student["studentId"],
-                    "studentName": student["studentname"],
-                    "part": matched_part,
+                    "studentId": form["studentId"],
+                    "studentName": student_name,
                     "organ": organ,
-                    "noOfConditions": len(cleaned_conditions),
-                    "conditions": {
-                        f"record{i + 1}": cond for i, cond in enumerate(cleaned_conditions)
-                    },
-                    "submissionDate": form.get("timestamp"),
-                    "status": form.get("status", "pending")
+                    "part": matched_part,
+                    "conditionsCount": len(cleaned_conditions),
+                    "conditions": cleaned_conditions,
+                    "lastUpdated": part_data.get("last_updated"),
+                    "status": part_data.get("status", "pending")
                 })
 
         return jsonify({
+            "success": True,
             "organ": organ,
             "part": matched_part,
-            "totalConditions": sum(len(item["conditions"]) for item in clinical_conditions),
-            "clinicalConditions": clinical_conditions
+            "totalConditions": sum(item["conditionsCount"] for item in clinical_conditions),
+            "results": clinical_conditions,
+            "count": len(clinical_conditions)
         }), 200
 
     except Exception as e:
+        app.logger.error(f"Error in get_clinical_conditions: {str(e)}")
         return jsonify({
-            "error": f"An error occurred: {str(e)}",
-            "organ": organ,
-            "part": part
+            "error": "Failed to fetch conditions",
+            "details": str(e)
         }), 500
-
 
 def is_valid_base64(data):
     try:
