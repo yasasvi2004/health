@@ -1611,6 +1611,56 @@ def add_to_dictionary():
         app.logger.error(f"Error adding term: {str(e)}")
         return jsonify({"error": "An unexpected error occurred"}), 500
 
+@app.route('/update_condition/<student_id>/<organ>/<part>/<int:condition_index>', methods=['PUT'])
+def update_condition(student_id, organ, part, condition_index):
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No update data provided"}), 400
+
+        # Find the organ document
+        organ_doc = organs_collection.find_one({"studentId": student_id, "organ": organ})
+        if not organ_doc:
+            return jsonify({"error": "Organ record not found"}), 404
+
+        # Check if part exists
+        if part not in organ_doc.get('inputfields', {}):
+            return jsonify({"error": f"Part '{part}' not found"}), 404
+
+        # Check if condition index is valid
+        conditions = organ_doc['inputfields'][part].get('conditions', [])
+        if condition_index >= len(conditions):
+            return jsonify({"error": f"Condition index {condition_index} out of range"}), 400
+
+        # Prepare updates
+        updates = {}
+        allowed_fields = ['clinicalCondition', 'status', 'feedback', ...]  # Your fields here
+        for field in data:
+            if field in allowed_fields:
+                updates[f"inputfields.{part}.conditions.{condition_index}.{field}"] = data[field]
+
+        if not updates:
+            return jsonify({"error": "No valid fields to update"}), 400
+
+        updates[f"inputfields.{part}.conditions.{condition_index}.last_updated"] = datetime.utcnow()
+
+        # Apply update
+        result = organs_collection.update_one(
+            {"studentId": student_id, "organ": organ},
+            {"$set": updates}
+        )
+
+        if result.modified_count == 0:
+            return jsonify({"error": "No changes made"}), 400
+
+        return jsonify({
+            "message": f"Condition {condition_index} updated successfully",
+            "updatedFields": list(data.keys())
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 
 
