@@ -1634,7 +1634,7 @@ def update_condition(student_id, organ, part, condition_index):
 
         # Prepare updates
         updates = {}
-        allowed_fields = ['clinicalCondition', 'status', 'feedback', ...]  # Your fields here
+        allowed_fields = ['clinicalCondition','signs','symptoms','clinicalObservation','bloodTests','urineTests','heartRate','bloodPressure','xRays','mriScans', 'status', 'feedback']  # Your fields here
         for field in data:
             if field in allowed_fields:
                 updates[f"inputfields.{part}.conditions.{condition_index}.{field}"] = data[field]
