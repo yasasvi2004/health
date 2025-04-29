@@ -708,68 +708,55 @@ def validate_organ(organ):
     return True
 
 
-@app.route('/get_clinical_conditions/<organ>/<part>', methods=['GET'])
-def get_clinical_conditions_by_organ_and_part(organ, part):
+@app.route('/get_clinical_conditions/<organ>', methods=['GET'])
+def get_clinical_conditions_by_organ(organ):
     try:
         # Validate organ exists in structure
         if organ not in organs_structure:
             return jsonify({"error": f"Invalid organ: {organ}"}), 400
 
-        # Find correct case for part name
+        # Get all parts for this organ
         organ_parts = organs_structure[organ]["parts"]
-        matched_part = next((p for p in organ_parts if p.lower() == part.lower()), None)
-        if not matched_part:
-            return jsonify({"error": f"Invalid part '{part}' for organ '{organ}'"}), 400
 
-        # Query for forms with conditions in this organ/part
+        # Query for forms with any conditions in this organ
         forms = organs_collection.find({
             "organ": organ,
-            f"inputfields.{matched_part}.conditions": {"$exists": True, "$ne": []}
+            "inputfields": {"$exists": True}
         })
 
         clinical_conditions = []
 
         for form in forms:
-            # Get conditions for this specific part
-            part_data = form.get("inputfields", {}).get(matched_part, {})
-            part_conditions = part_data.get("conditions", [])
-
-            if not part_conditions:
-                continue
-
-            # Get student details
             student = Student_collection.find_one({"studentId": form["studentId"]})
             student_name = student.get("studentname") if student else "Unknown"
 
-            # Prepare cleaned conditions
-            cleaned_conditions = []
-            for cond in part_conditions:
-                if cond and cond.get("clinicalCondition"):
-                    cleaned_cond = {
-                        k: v for k, v in cond.items()
-                        if v not in [None, ""] and k != "_id"
-                    }
-                    cleaned_conditions.append(cleaned_cond)
+            # Collect conditions from all parts of this organ
+            for part_name, part_data in form.get("inputfields", {}).items():
+                # Skip if not a part of this organ or no conditions
+                if part_name not in organ_parts or not part_data.get("conditions"):
+                    continue
 
-            if cleaned_conditions:
-                clinical_conditions.append({
-                    "studentId": form["studentId"],
-                    "studentName": student_name,
-                    "organ": organ,
-                    "part": matched_part,
-                    "conditionsCount": len(cleaned_conditions),
-                    "conditions": cleaned_conditions,
-                    "lastUpdated": part_data.get("last_updated"),
-                    "status": part_data.get("status", "pending")
-                })
+                for condition in part_data["conditions"]:
+                    if condition and condition.get("clinicalCondition"):
+                        cleaned_cond = {
+                            k: v for k, v in condition.items()
+                            if v not in [None, ""] and k != "_id"
+                        }
+                        clinical_conditions.append({
+                            "studentId": form["studentId"],
+                            "studentName": student_name,
+                            "organ": organ,
+                            "part": part_name,
+                            "condition": cleaned_cond,
+                            "lastUpdated": part_data.get("last_updated"),
+                            "status": part_data.get("status", "pending")
+                        })
 
         return jsonify({
             "success": True,
             "organ": organ,
-            "part": matched_part,
-            "totalConditions": sum(item["conditionsCount"] for item in clinical_conditions),
-            "results": clinical_conditions,
-            "count": len(clinical_conditions)
+            "totalConditions": len(clinical_conditions),
+            "conditions": clinical_conditions
         }), 200
 
     except Exception as e:
