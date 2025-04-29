@@ -1551,30 +1551,46 @@ def add_to_dictionary():
         if not data:
             return jsonify({"error": "No data provided"}), 400
 
-        # Check required 'term' field
-        if 'term' not in data or not isinstance(data['term'], str):
-            return jsonify({"error": "Missing or invalid field: term"}), 400
+        # Check required fields
+        required_fields = ['term', 'organ', 'part']
+        for field in required_fields:
+            if field not in data or not isinstance(data[field], str):
+                return jsonify({"error": f"Missing or invalid field: {field}"}), 400
 
         term = data['term'].strip()
+        organ = data['organ'].strip()
+        part = data['part'].strip()
+
         if not term:
             return jsonify({"error": "Term cannot be empty"}), 400
+        if not organ:
+            return jsonify({"error": "Organ cannot be empty"}), 400
+        if not part:
+            return jsonify({"error": "Part cannot be empty"}), 400
 
         # Prepare dictionary entry
         dictionary_entry = {
             "term": term,
-            "definition": data.get('definition', '').strip()  # Optional field
+            "organ": organ,
+            "part": part,
+            "definition": data.get('definition', '').strip()
+
         }
 
-        # Check for existing term (case-insensitive)
+        # Check for existing term (case-insensitive within same organ/part)
         existing_term = dictionary_collection.find_one({
-            "term": {"$regex": f"^{term}$", "$options": "i"}
+            "term": {"$regex": f"^{term}$", "$options": "i"},
+            "organ": organ,
+            "part": part
         })
 
         if existing_term:
             return jsonify({
-                "error": "Term already exists",
+                "error": "Term already exists for this organ/part combination",
                 "existing_id": str(existing_term['_id']),
-                "existing_term": existing_term['term']
+                "existing_term": existing_term['term'],
+                "organ": existing_term['organ'],
+                "part": existing_term['part']
             }), 409
 
         # Insert into database
@@ -1585,7 +1601,10 @@ def add_to_dictionary():
             "message": "Term added to dictionary successfully",
             "id": str(result.inserted_id),
             "term": term,
-            "definition": dictionary_entry['definition'] if dictionary_entry['definition'] else None,
+            "organ": organ,
+            "part": part,
+            "definition": dictionary_entry['definition'] if dictionary_entry['definition'] else None
+
         }), 201
 
     except Exception as e:
