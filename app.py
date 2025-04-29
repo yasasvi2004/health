@@ -23,6 +23,7 @@ db = client.get_database(os.getenv('MONGODB_DBNAME'))
 Doctor_collection = db['Doctor']
 Student_collection = db['Student']
 organs_collection = db['Organs']
+dictionary_collection = db['Information']
 
 CORS(app)
 
@@ -1540,6 +1541,56 @@ def fetch_conditions(student_id, organ, part):
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/add_to_dictionary', methods=['POST'])
+def add_to_dictionary():
+    try:
+        # Validate incoming data
+        data = request.json
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        # Check required 'term' field
+        if 'term' not in data or not isinstance(data['term'], str):
+            return jsonify({"error": "Missing or invalid field: term"}), 400
+
+        term = data['term'].strip()
+        if not term:
+            return jsonify({"error": "Term cannot be empty"}), 400
+
+        # Prepare dictionary entry
+        dictionary_entry = {
+            "term": term,
+            "definition": data.get('definition', '').strip()  # Optional field
+        }
+
+        # Check for existing term (case-insensitive)
+        existing_term = dictionary_collection.find_one({
+            "term": {"$regex": f"^{term}$", "$options": "i"}
+        })
+
+        if existing_term:
+            return jsonify({
+                "error": "Term already exists",
+                "existing_id": str(existing_term['_id']),
+                "existing_term": existing_term['term']
+            }), 409
+
+        # Insert into database
+        result = dictionary_collection.insert_one(dictionary_entry)
+
+        # Return success response
+        return jsonify({
+            "message": "Term added to dictionary successfully",
+            "id": str(result.inserted_id),
+            "term": term,
+            "definition": dictionary_entry['definition'] if dictionary_entry['definition'] else None,
+        }), 201
+
+    except Exception as e:
+        app.logger.error(f"Error adding term: {str(e)}")
+        return jsonify({"error": "An unexpected error occurred"}), 500
 
 
 
