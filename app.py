@@ -1648,6 +1648,17 @@ def update_condition(student_id, organ, part, condition_index):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/get_terms_definitions', methods=['GET'])
+def get_terms_definitions():
+    try:
+        cursor = dictionary_collection.find({}, {"_id": 0, "term": 1, "definition": 1})
+        terms_list = [{"term": doc["term"], "definition": doc.get("definition", "")} for doc in cursor]
+        return jsonify({"terms": terms_list}), 200
+    except Exception as e:
+        app.logger.error(f"Error fetching terms and definitions: {str(e)}")
+        return jsonify({"error": "Failed to retrieve terms and definitions"}), 500
+
+
 
 
 
