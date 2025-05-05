@@ -1036,8 +1036,6 @@ def review_part(student_id, organ, part_name):
         if action not in ['approve', 'reject','review']:
             return jsonify({"error": "Invalid action. Must be 'approve' or 'reject'."}), 400
 
-
-
         # Find and validate the organ document
         organ_document = organs_collection.find_one({"studentId": student_id, "organ": organ})
         if not organ_document:
@@ -1047,18 +1045,12 @@ def review_part(student_id, organ, part_name):
         if part_name not in organ_document.get('inputfields', {}):
             return jsonify({"error": f"Part {part_name} not found in inputfields"}), 404
 
-        # Check if all conditions are already approved/rejected
-        part_conditions = organ_document['inputfields'][part_name].get('conditions', [])
-        if not all(cond.get('status') in ['approved', 'rejected'] for cond in part_conditions):
-            return jsonify({
-                "error": "Cannot approve/reject part until all conditions are approved or rejected",
-                "unresolved_conditions": [
-                    i for i, cond in enumerate(part_conditions)
-                    if cond.get('status') not in ['approved', 'rejected']
-                ]
-            }), 400
+
+
+        # Set the new status based on action
         new_status = 'approved' if action == 'approve' else 'rejected' if action == 'reject' else 'review' if action == 'reviewed' else None
-        # Prepare the update
+
+        # Prepare the update data
         update_data = {
             f"inputfields.{part_name}.status": new_status,
             f"inputfields.{part_name}.reviewed_at": datetime.utcnow(),
