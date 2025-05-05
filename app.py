@@ -1500,7 +1500,6 @@ def submit_conditions(student_id, organ, part):
         }), 500
 
 
-
 @app.route('/fetch_conditions/<student_id>/<organ>/<part>', methods=['GET'])
 def fetch_conditions(student_id, organ, part):
     try:
@@ -1518,11 +1517,37 @@ def fetch_conditions(student_id, organ, part):
             return jsonify({"error": f"Part {part} not found in inputfields"}), 404
 
         # Get the conditions for the part
-        part_conditions = organ_document['inputfields'][part].get('conditions', [])
+        part_data = organ_document['inputfields'][part]
+        part_conditions = part_data.get('conditions', [])
+
+        # Get feedback for the part (if exists)
+
+
+        # Get feedback for each condition
+        conditions_with_feedback = []
+        for condition in part_conditions:
+            condition_feedback = {
+                "clinicalCondition": condition.get('clinicalCondition', ''),
+                "status": condition.get('status', 'pending'),
+                "feedback": condition.get('feedback', ''),
+                "reviewed_at": condition.get('reviewed_at', ''),
+                "reviewed_by": condition.get('reviewed_by', ''),
+                "symptoms": condition.get('symptoms', ''),
+                "signs": condition.get('signs', ''),
+                "clinicalObservations": condition.get('clinicalObservations', ''),
+                "bloodTests": condition.get('bloodTests', ''),
+                "urineTests": condition.get('urineTests', ''),
+                "heartRate": condition.get('heartRate', ''),
+                "bloodPressure": condition.get('bloodPressure', ''),
+                "xRays": condition.get('xRays', ''),
+                "mriScans": condition.get('mriScans', '')
+            }
+            conditions_with_feedback.append(condition_feedback)
 
         return jsonify({
             "message": "Conditions fetched successfully.",
-            "conditions": part_conditions
+            "conditions": conditions_with_feedback,
+
         }), 200
 
     except Exception as e:
