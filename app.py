@@ -1387,9 +1387,6 @@ def submit_form(organ, part):
         return jsonify({"error": str(e)}), 500
 
 
-
-
-
 @app.route('/submit_conditions/<student_id>/<organ>/<part>', methods=['POST'])
 def submit_conditions(student_id, organ, part):
     try:
@@ -1400,18 +1397,18 @@ def submit_conditions(student_id, organ, part):
         if organ not in organs_structure:
             return jsonify({"error": f"Invalid organ: {organ}"}), 400
 
-            # Find correct case for part name
+        # Find correct case for part name
         organ_parts = organs_structure[organ]["parts"]
         matched_part = next((p for p in organ_parts if p.lower() == normalized_part), None)
         if not matched_part:
             return jsonify({"error": f"Invalid part: {part}"}), 400
 
-            # Validate student exists
+        # Validate student exists
         student = Student_collection.find_one({"studentId": student_id})
         if not student:
             return jsonify({"error": "Student not found"}), 404
 
-            # Validate request data
+        # Validate request data
         data = request.json
         if not data or not isinstance(data.get('conditions', []), list):
             return jsonify({"error": "Conditions data must be an array"}), 400
@@ -1439,40 +1436,53 @@ def submit_conditions(student_id, organ, part):
                 "status": "pending"
             })
 
-            # Find existing document or prepare new one
+        # Find existing document or prepare new one
         existing_organ = organs_collection.find_one({"studentId": student_id, "organ": organ})
 
         if existing_organ:
-            # Check if part exists but isn't an object
-            if matched_part in existing_organ.get('inputfields', {}) and not isinstance(
-                    existing_organ['inputfields'][matched_part], dict):
-                return jsonify({
-                    "error": f"Invalid existing data structure for part '{matched_part}'",
-                    "solution": "Please contact admin to fix data consistency"
-                }), 400
+            # Initialize the part structure if it doesn't exist or is in wrong format
+            if (matched_part not in existing_organ.get('inputfields', {}) or
+                    not isinstance(existing_organ['inputfields'].get(matched_part), dict)):
 
-                # Prepare update operation
-            update = {
-                "$set": {
-                    "last_updated": timestamp,
-                    "studentName": student.get('studentname')
-                },
-                "$push": {f"inputfields.{matched_part}.conditions": {"$each": conditions_data}}
-            }
+                # First ensure inputfields exists
+                if 'inputfields' not in existing_organ:
+                    update_data = {'$set': {'inputfields': {}}}
+                    organs_collection.update_one(
+                        {"_id": existing_organ["_id"]},
+                        update_data
+                    )
+                    existing_organ = organs_collection.find_one({"_id": existing_organ["_id"]})
 
-            # If part doesn't exist, initialize it
-            if matched_part not in existing_organ['inputfields']:
-                update["$set"][f"inputfields.{matched_part}"] = {
-                    "status": "pending",
-                    "conditions": conditions_data
+                # Then set up the part structure properly
+                update_data = {
+                    '$set': {
+                        f'inputfields.{matched_part}': {
+                            'status': 'pending',
+                            'conditions': []
+                        },
+                        'last_updated': timestamp
+                    }
                 }
+                organs_collection.update_one(
+                    {"_id": existing_organ["_id"]},
+                    update_data
+                )
+                existing_organ = organs_collection.find_one({"_id": existing_organ["_id"]})
 
+            # Now safely push the conditions
             result = organs_collection.update_one(
                 {"_id": existing_organ["_id"]},
-                update
+                {
+                    "$push": {f"inputfields.{matched_part}.conditions": {"$each": conditions_data}},
+                    "$set": {
+                        "last_updated": timestamp,
+                        "studentName": student.get('studentname'),
+                        "status": "pending"
+                    }
+                }
             )
         else:
-            # Create new document
+            # Create new document with proper structure
             organ_data = {
                 "organ": organ,
                 "studentId": student_id,
