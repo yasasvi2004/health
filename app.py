@@ -696,7 +696,16 @@ organs_structure = {
             "superiorSuprarenalArteries", "middleSuprarenalArtery", "inferiorSuprarenalArteries",
             "adrenalMedulla", "additionalClassification"
         ]
+    },
+
+    "joints": {
+        "parts": ["fibrousJoints", "cartilaginousJoints", "synovialJoints", "hingeJoints", "ballAndSocketJoints",
+              "pivotJoints", "saddleJoints", "condyloidJoints", "planeJoints", "shoulderJoint", "elbowJoint", "hipJoint",
+              "kneeJoint", "ankleJoint", "wristJoint", "additionalClassification"]
     }
+
+
+
     # Add more organs as needed
 }
 
@@ -798,13 +807,6 @@ def count_forms_by_doctor():
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
-
-
-
-
-
-
 
 
 
